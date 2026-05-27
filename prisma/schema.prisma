@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Service {
+  id                Int           @id @default(autoincrement())
+  name              String
+  description       String?
+  category          String        // MAQUILLAJE, CEJAS, PESTAÑAS, MANICURE
+  price             Float
+  duration          Int           // duración en minutos
+  commissionPercent Float         @default(0) // % de comisión para la empleada
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  appointments      Appointment[]
+  saleItems         SaleItem[]
+}
+
+model Client {
+  id                  Int           @id @default(autoincrement())
+  name                String
+  phone               String?
+  email               String?
+  birthDate           DateTime?
+  notes               String?
+  visitCount          Int           @default(0)    // Contador de visitas completadas
+  freeServiceAvailable Boolean      @default(false) // Servicio gratis disponible (cada 5 visitas)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  appointments        Appointment[]
+  sales               Sale[]
+}
+
+model Appointment {
+  id         Int       @id @default(autoincrement())
+  date       DateTime
+  status     String    @default("PENDIENTE") // PENDIENTE, CONFIRMADA, COMPLETADA, CANCELADA
+  notes      String?
+  clientId   Int
+  serviceId  Int
+  employeeId Int?
+  client     Client    @relation(fields: [clientId], references: [id])
+  service    Service   @relation(fields: [serviceId], references: [id])
+  employee   Employee? @relation(fields: [employeeId], references: [id])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Sale {
+  id            Int        @id @default(autoincrement())
+  date          DateTime   @default(now())
+  total         Float
+  totalBs       Float?
+  exchangeRate  Float?
+  paymentMethod String?    // EFECTIVO, TARJETA, TRANSFERENCIA, PAGO MOVIL, OTRO
+  notes         String?
+  clientId      Int?
+  employeeId    Int?
+  client        Client?    @relation(fields: [clientId], references: [id])
+  employee      Employee?  @relation(fields: [employeeId], references: [id])
+  items         SaleItem[]
+  createdAt     DateTime   @default(now())
+}
+
+model SaleItem {
+  id        Int      @id @default(autoincrement())
+  quantity  Int      @default(1)
+  price     Float
+  saleId    Int
+  serviceId Int?
+  productId Int?
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  service   Service? @relation(fields: [serviceId], references: [id])
+  product   Product? @relation(fields: [productId], references: [id])
+}
+
+model WATemplate {
+  id      Int    @id @default(autoincrement())
+  label   String
+  message String
+}
+
+model Employee {
+  id            Int                    @id @default(autoincrement())
+  name          String
+  phone         String?
+  email         String?
+  role          String                 @default("EMPLEADA") // EMPLEADA, ADMIN, ESTETICISTA
+  password      String?                // Solo para usuarios con acceso al sistema
+  active        Boolean                @default(true)
+  startDate     DateTime?
+  notes         String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  sales         Sale[]
+  appointments  Appointment[]
+  availabilities EmployeeAvailability[]
+  attendances   Attendance[]
+}
+
+model EmployeeAvailability {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  dayOfWeek  Int      // 0=DOMINGO, 1=LUNES ... 6=SÁBADO
+  startTime  String   // "09:00"
+  endTime    String   // "18:00"
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, dayOfWeek])
+}
+
+model Product {
+  id          Int        @id @default(autoincrement())
+  name        String
+  description String?
+  quantity    Int        @default(0)
+  minStock    Int        @default(5)
+  price       Float?
+  category    String?    // MAQUILLAJE, CEJAS, PESTAÑAS, MANICURE, GENERAL
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  saleItems   SaleItem[]
+}
+
+model StudioSettings {
+  id               Int     @id @default(autoincrement())
+  name             String  @default("Sakura Studio")
+  subtitle         String  @default("Estudio de Belleza")
+  address          String  @default("Plaza Las Américas II, El Cafetal, Caracas")
+  phone            String  @default("Tel: 555-9876")
+  email            String  @default("Email: info@sakurastudio.com")
+  workLatitude     Float?  // Latitud del estudio (para check-in GPS)
+  workLongitude    Float?  // Longitud del estudio
+  workLocationName String? @default("Plaza Las Américas II, El Cafetal")
+  workRadius       Float?  @default(200) // Radio de tolerancia en metros
+}
+
+model Attendance {
+  id         Int      @id @default(autoincrement())
+  employeeId Int
+  date       DateTime @default(now())
+  latitude   Float?   // Latitud del check-in
+  longitude  Float?   // Longitud del check-in
+  accuracy   Float?   // Precisión del GPS en metros
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String   // CREATE, UPDATE, DELETE
+  entity     String   // Service, Client, Employee, Sale, Appointment, Product, StudioSettings, WATemplate
+  entityId   Int?     // ID del registro afectado
+  description String   // Descripción legible de la acción
+  userId     String?  // ID del usuario que realizó la acción
+  userName   String?  // Nombre del usuario
+  createdAt  DateTime @default(now())
+}
