@@ -737,14 +737,14 @@ export default function Dashboard() {
                         {cat._count} realizados
                       </span>
                     </div>
-                    <div className="relative">
-                      <div className="h-3 bg-white/70 rounded-full overflow-hidden">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-3 bg-white/70 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${cfg.bar} transition-all duration-1000 ease-out`}
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
-                      <span className="absolute right-0 -top-6 text-xs text-muted font-medium">{percentage}%</span>
+                      <span className="text-xs font-semibold text-muted flex-shrink-0 w-10 text-right">{percentage}%</span>
                     </div>
                   </div>
                 );
