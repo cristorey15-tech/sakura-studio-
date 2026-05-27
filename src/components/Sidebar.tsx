@@ -197,7 +197,7 @@ export default function TopNavbar() {
               <img
                 src="/logo.png"
                 alt="Sakura Studio"
-                className="h-6 lg:h-7 xl:h-8 w-auto"
+                className="h-8 lg:h-9 xl:h-10 w-auto"
               />
             </Link>
 
