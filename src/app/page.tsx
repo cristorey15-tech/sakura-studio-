@@ -522,10 +522,10 @@ export default function Dashboard() {
                   <YAxis
                     type="category"
                     dataKey="name"
-                    tick={{ fontSize: 12, fill: "#334155" }}
+                    tick={{ fontSize: 11, fill: "#334155" }}
                     tickLine={false}
                     axisLine={false}
-                    width={120}
+                    width={160}
                   />
                   <Tooltip
                     contentStyle={{
@@ -537,7 +537,7 @@ export default function Dashboard() {
                     }}
                     formatter={(value: number, name: string) => [value, "Reservas"]}
                   />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={24}>
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={20}>
                     {data.topServices.map((s) => (
                       <Cell key={`ts-${s.id}`} fill={CHART_COLORS[s.id % CHART_COLORS.length]} />
                     ))}
