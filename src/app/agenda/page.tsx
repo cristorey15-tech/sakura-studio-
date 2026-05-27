@@ -116,7 +116,7 @@ export default function AgendaPage() {
     loadData();
   }, [loadData]);
 
-  // Silent polling cada 15s
+  // Silent polling cada 15s con detección de nuevas citas
   useEffect(() => {
     const interval = setInterval(() => {
       Promise.all([
@@ -125,7 +125,21 @@ export default function AgendaPage() {
         apiFetch<Client[]>("/api/clientes").then(({ data }) => Array.isArray(data) ? data : []),
         apiFetch<Employee[]>("/api/empleadas").then(({ data }) => Array.isArray(data) ? data : []),
       ]).then(([appts, svcs, clts, emps]) => {
-        setAppointments(appts);
+        setAppointments((prev) => {
+          // Detectar nuevas citas no canceladas
+          if (prev.length > 0 && appts.length > prev.length) {
+            const newAppts = appts.filter(
+              (a) => !prev.find((p) => p.id === a.id) && a.status !== "CANCELADA"
+            );
+            if (newAppts.length > 0) {
+              newAppts.forEach((apt) => {
+                const time = new Date(apt.date).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+                showToast("info", `📅 Nueva cita: ${apt.client.name} — ${apt.service.name} a las ${time}`);
+              });
+            }
+          }
+          return appts;
+        });
         setServices(svcs);
         setClients(clts);
         setEmployees(emps);

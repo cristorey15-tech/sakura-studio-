@@ -214,6 +214,8 @@ export default function TopNavbar() {
                         ? "bg-primary text-white shadow-sm"
                         : "text-muted hover:bg-surface hover:text-dark"
                     }`}
+                    title={item.name}
+                    aria-label={item.name}
                   >
                     <span className="flex-shrink-0">{item.icon}</span>
                     {item.showLabel !== false && <span>{item.name}</span>}

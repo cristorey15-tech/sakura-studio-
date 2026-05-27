@@ -52,6 +52,7 @@ export default function InventarioPage() {
   const [totalProducts, setTotalProducts] = useState(0);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [inventoryStats, setInventoryStats] = useState({
     totalProducts: 0,
@@ -112,6 +113,7 @@ export default function InventarioPage() {
     const url = editingId ? `/api/inventario/${editingId}` : "/api/inventario";
     const method = editingId ? "PUT" : "POST";
 
+    setSubmitting(true);
     const { data, error: apiError } = await apiFetch(url, {
       method,
       body: JSON.stringify({
@@ -132,6 +134,7 @@ export default function InventarioPage() {
     } else {
       showToast("error", apiError || "Error al guardar el producto");
     }
+    setSubmitting(false);
   };
 
   const handleEdit = (product: Product) => {
@@ -293,7 +296,17 @@ export default function InventarioPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm); }} className="btn-secondary">Cancelar</button>
-            <button type="submit" className="btn-primary">{editingId ? "Guardar Cambios" : "Crear Producto"}</button>
+            <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Guardando...
+                </span>
+              ) : (editingId ? "Guardar Cambios" : "Crear Producto")}
+            </button>
           </div>
         </form>
       )}
@@ -317,8 +330,20 @@ export default function InventarioPage() {
               }, 250);
             }}
             placeholder="Buscar productos..."
-            className="input pl-10 py-3"
+            className="input pl-10 pr-10 py-3"
           />
+          {search && (
+            <button
+              onClick={() => { setSearch(""); setLoading(true); loadProducts(1); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-lg hover:bg-surface text-muted hover:text-dark transition-colors"
+              title="Limpiar búsqueda"
+              aria-label="Limpiar búsqueda"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
         <select
           value={filterCategory}

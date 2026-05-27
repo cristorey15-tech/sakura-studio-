@@ -8,7 +8,15 @@ import { requireWriteAdmin } from "@/lib/requireRole";
 export async function GET() {
   try {
     const services = await prisma.service.findMany({
-      orderBy: { category: "asc" },
+      include: {
+        _count: {
+          select: { saleItems: true },
+        },
+      },
+      orderBy: [
+        { saleItems: { _count: "desc" } },
+        { category: "asc" },
+      ],
     });
     return NextResponse.json(services);
   } catch (error) {

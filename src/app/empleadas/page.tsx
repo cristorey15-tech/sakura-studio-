@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApiQuery } from "@/hooks/useApiQuery";
@@ -70,6 +71,7 @@ export default function EmpleadasPage() {
   const [commissionsLoading, setCommissionsLoading] = useState(true);
   const [showCommissions, setShowCommissions] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // ─── Availability State ───
   const [availEmployee, setAvailEmployee] = useState<Employee | null>(null);
@@ -155,6 +157,7 @@ export default function EmpleadasPage() {
       return;
     }
 
+    setSubmitting(true);
     const url = editingId ? `/api/empleadas/${editingId}` : "/api/empleadas";
     const method = editingId ? "PUT" : "POST";
 
@@ -172,6 +175,7 @@ export default function EmpleadasPage() {
     } else {
       showToast("error", apiError || "Error al guardar la empleada");
     }
+    setSubmitting(false);
   };
 
   const handleEdit = (employee: Employee) => {
@@ -431,7 +435,17 @@ export default function EmpleadasPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm); }} className="btn-secondary">Cancelar</button>
-            <button type="submit" className="btn-primary">{editingId ? "Guardar Cambios" : "Crear Empleada"}</button>
+            <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Guardando...
+                </span>
+              ) : (editingId ? "Guardar Cambios" : "Crear Empleada")}
+            </button>
           </div>
         </form>
       )}
@@ -464,7 +478,12 @@ export default function EmpleadasPage() {
                         <span className="text-lg">{cfg.icon}</span>
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-dark text-sm truncate">{employee.name}</h3>
+                        <Link
+                          href={`/empleadas/${employee.id}`}
+                          className="font-semibold text-dark text-sm truncate hover:text-primary transition-colors block"
+                        >
+                          {employee.name}
+                        </Link>
                         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full mt-0.5 ${cfg.color} ${cfg.bg}`}>
                           {employee.role}
                         </span>

@@ -6,6 +6,57 @@ import { createAuditLog } from "@/lib/auditLog";
 import { requireRole } from "@/lib/requireRole";
 import bcrypt from "bcryptjs";
 
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const employee = await prisma.employee.findUnique({
+      where: { id: Number(id) },
+      include: {
+        _count: {
+          select: {
+            sales: true,
+            appointments: true,
+          },
+        },
+        appointments: {
+          include: {
+            service: { select: { name: true, category: true, price: true } },
+            client: { select: { name: true } },
+          },
+          orderBy: { date: "desc" },
+          take: 20,
+        },
+        sales: {
+          include: {
+            items: {
+              include: {
+                service: { select: { name: true, category: true } },
+              },
+            },
+            client: { select: { name: true } },
+          },
+          orderBy: { date: "desc" },
+          take: 20,
+        },
+        availabilities: true,
+      },
+    });
+    if (!employee) {
+      return NextResponse.json({ error: "Empleada no encontrada" }, { status: 404 });
+    }
+    const { password, ...safeEmployee } = employee;
+    return NextResponse.json(safeEmployee);
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Error al obtener empleada" },
+      { status: 500 }
+    );
+  }
+}
+
 export const PUT = withCsrf(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }

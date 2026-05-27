@@ -51,9 +51,11 @@ export default function ServiciosPage() {
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     const url = editingId ? `/api/servicios/${editingId}` : "/api/servicios";
     const method = editingId ? "PUT" : "POST";
 
@@ -76,6 +78,7 @@ export default function ServiciosPage() {
     } else {
       showToast("error", apiError || "Error al guardar el servicio");
     }
+    setSubmitting(false);
   };
 
   const handleEdit = (service: Service) => {
@@ -189,7 +192,17 @@ export default function ServiciosPage() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm); }} className="btn-secondary">Cancelar</button>
-            <button type="submit" className="btn-primary">{editingId ? "Guardar Cambios" : "Crear Servicio"}</button>
+            <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Guardando...
+                </span>
+              ) : (editingId ? "Guardar Cambios" : "Crear Servicio")}
+            </button>
           </div>
         </form>
       )}
