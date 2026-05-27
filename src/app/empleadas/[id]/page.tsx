@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { useToast } from "@/hooks/useToast";
 import { SkeletonPageHeader, SkeletonBlock } from "@/components/LoadingSkeleton";
 
 interface EmployeeDetail {
@@ -58,6 +59,7 @@ const daysOfWeek = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viern
 export default function EmployeeDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const [employee, setEmployee] = useState<EmployeeDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -180,9 +182,32 @@ export default function EmployeeDetailPage() {
               )}
             </div>
           </div>
-          <Link href="/empleadas" className="btn-secondary text-sm shrink-0">
-            Editar
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={async () => {
+                const { data } = await apiFetch(`/api/empleadas/${employee.id}`, {
+                  method: "PUT",
+                  body: JSON.stringify({ active: !employee.active }),
+                });
+                if (data) {
+                  showToast("success", employee.active ? "Empleada desactivada" : "Empleada reactivada");
+                  setEmployee({ ...employee, active: !employee.active });
+                } else {
+                  showToast("error", "Error al cambiar estado");
+                }
+              }}
+              className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                employee.active
+                  ? 'bg-warning-bg text-warning hover:bg-warning/20 border border-warning/30'
+                  : 'bg-success-bg text-success hover:bg-success/20 border border-success/30'
+              }`}
+            >
+              {employee.active ? 'Desactivar' : 'Reactivar'}
+            </button>
+            <Link href="/empleadas" className="btn-secondary text-sm">
+              Editar
+            </Link>
+          </div>
         </div>
         {employee.notes && (
           <p className="mt-4 pt-4 border-t border-border text-sm text-muted italic">{employee.notes}</p>

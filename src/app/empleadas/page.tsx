@@ -55,6 +55,7 @@ const emptyForm = {
   startDate: "",
   notes: "",
   password: "",
+  active: true,
 };
 
 export default function EmpleadasPage() {
@@ -187,6 +188,7 @@ export default function EmpleadasPage() {
       startDate: employee.startDate ? employee.startDate.split("T")[0] : "",
       notes: employee.notes || "",
       password: "",
+      active: employee.active,
     });
     setEditingId(employee.id);
     setShowForm(true);
@@ -432,6 +434,23 @@ export default function EmpleadasPage() {
               <label className="block text-sm font-medium text-dark mb-1.5">Notas</label>
               <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="input resize-none" placeholder="Notas adicionales..." />
             </div>
+            {editingId && (
+              <div className="md:col-span-2">
+                <label className="relative inline-flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success" />
+                  <span className={`text-sm font-medium ${form.active ? 'text-dark' : 'text-muted'}`}>
+                    {form.active ? 'Empleada activa' : 'Empleada inactiva'}
+                  </span>
+                </label>
+                <p className="text-[11px] text-muted mt-1 ml-12">Si desactivas, la empleada no aparecerá en agenda, ventas ni podrá iniciar sesión.</p>
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(emptyForm); }} className="btn-secondary">Cancelar</button>
@@ -506,6 +525,15 @@ export default function EmpleadasPage() {
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleToggleActive(employee)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-warning-bg text-muted hover:text-warning transition-colors"
+                        title="Desactivar"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                         </svg>
                       </button>
                       <button
