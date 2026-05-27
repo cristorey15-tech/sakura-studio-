@@ -94,9 +94,10 @@ interface CartItem {
 
 type Step = "services" | "payment";
 
-const categories = ["MAQUILLAJE", "CEJAS", "PESTAÑAS", "MANICURE"];
+const categories = ["GENERAL", "MAQUILLAJE", "CEJAS", "PESTAÑAS", "MANICURE"];
 
 const categoryConfig: Record<string, { color: string; bg: string; icon: string }> = {
+  GENERAL: { color: "text-teal-600", bg: "bg-teal-50", icon: "🔧" },
   MAQUILLAJE: { color: "text-primary", bg: "bg-primary-bg", icon: "💄" },
   CEJAS: { color: "text-warning", bg: "bg-warning-bg", icon: "👁️" },
   PESTAÑAS: { color: "text-violet-600", bg: "bg-violet-50", icon: "✨" },

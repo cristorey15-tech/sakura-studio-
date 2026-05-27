@@ -720,6 +720,7 @@ export default function Dashboard() {
               data.weeklyCompletedByCategory.map((cat) => {
                 const percentage = totalWeeklyCompleted > 0 ? ((cat._count / totalWeeklyCompleted) * 100).toFixed(0) : 0;
                 const colors: Record<string, { bar: string; bg: string; icon: string }> = {
+                  GENERAL: { bar: "bg-teal-500", bg: "bg-teal-50", icon: "🔧" },
                   MAQUILLAJE: { bar: "bg-primary", bg: "bg-primary-bg", icon: "💄" },
                   CEJAS: { bar: "bg-warning", bg: "bg-warning-bg", icon: "👁️" },
                   PESTAÑAS: { bar: "bg-violet-500", bg: "bg-violet-50", icon: "✨" },

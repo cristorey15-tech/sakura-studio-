@@ -31,6 +31,7 @@ interface SearchResults {
 }
 
 const categoryIcon: Record<string, string> = {
+  GENERAL: "🔧",
   MAQUILLAJE: "💄",
   CEJAS: "👁️",
   PESTAÑAS: "✨",

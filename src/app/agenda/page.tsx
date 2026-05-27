@@ -53,6 +53,7 @@ const statusColors: Record<string, string> = {
 };
 
 const categoryColors: Record<string, string> = {
+  GENERAL: "border-l-teal-500",
   MAQUILLAJE: "border-l-primary",
   CEJAS: "border-l-warning",
   PESTAÑAS: "border-l-violet-500",
@@ -60,6 +61,7 @@ const categoryColors: Record<string, string> = {
 };
 
 const categoryBgColors: Record<string, string> = {
+  GENERAL: "bg-teal-50 text-teal-700",
   MAQUILLAJE: "bg-primary-bg text-primary",
   CEJAS: "bg-warning-bg text-warning",
   PESTAÑAS: "bg-violet-50 text-violet-700",
@@ -756,6 +758,7 @@ function AppointmentList({
 // ─── DayTimeline component ───
 
 const timelineCategoryColors: Record<string, string> = {
+  GENERAL: "bg-teal-500/85 border-teal-500",
   MAQUILLAJE: "bg-primary/85 border-primary",
   CEJAS: "bg-warning/85 border-warning",
   PESTAÑAS: "bg-violet-500/85 border-violet-500",
@@ -1009,12 +1012,15 @@ function DayTimeline({
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-full bg-violet-500/85" />
           Pestañas
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500/85" />
-          Manicure
-        </span>
-        <span className="ml-auto font-medium">
+        </span>          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/85" />
+            Manicure
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-teal-500/85" />
+            General
+          </span>
+          <span className="ml-auto font-medium">
           {dayAppointments.length} cita{dayAppointments.length !== 1 ? "s" : ""} — {dayAppointments.reduce((sum, a) => sum + a.service.duration, 0)} min
         </span>
       </div>
