@@ -84,6 +84,29 @@ export default function InventarioPage() {
     loadProducts(1);
   }, []);
 
+  // Silent polling cada 15s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const params = new URLSearchParams({ page: String(page), limit: "10" });
+      if (search) params.set("q", search);
+      if (filterCategory !== "TODAS") params.set("category", filterCategory);
+      if (filterStock !== "TODOS") params.set("stock", filterStock);
+      apiFetch<{ data: Product[]; page: number; totalPages: number; total: number; stats: typeof inventoryStats }>(`/api/inventario?${params}`)
+        .then(({ data }) => {
+          if (data) {
+            setProducts(data.data);
+            setPage(data.page);
+            setTotalPages(data.totalPages);
+            setTotalProducts(data.total);
+            if (data.stats) setInventoryStats(data.stats);
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [page, search, filterCategory, filterStock]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const url = editingId ? `/api/inventario/${editingId}` : "/api/inventario";

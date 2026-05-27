@@ -43,7 +43,9 @@ export default function ServiciosPage() {
   const { isAdmin } = useAuth();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
-  const { data: services = [], isLoading } = useApiQuery<Service[]>(["servicios"], "/api/servicios");
+  const { data: services = [], isLoading } = useApiQuery<Service[]>(["servicios"], "/api/servicios", {
+    refetchInterval: 15000,
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);

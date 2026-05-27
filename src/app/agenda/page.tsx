@@ -116,6 +116,25 @@ export default function AgendaPage() {
     loadData();
   }, [loadData]);
 
+  // Silent polling cada 15s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      Promise.all([
+        apiFetch<Appointment[]>("/api/citas").then(({ data }) => Array.isArray(data) ? data : []),
+        apiFetch<Service[]>("/api/servicios").then(({ data }) => Array.isArray(data) ? data : []),
+        apiFetch<Client[]>("/api/clientes").then(({ data }) => Array.isArray(data) ? data : []),
+        apiFetch<Employee[]>("/api/empleadas").then(({ data }) => Array.isArray(data) ? data : []),
+      ]).then(([appts, svcs, clts, emps]) => {
+        setAppointments(appts);
+        setServices(svcs);
+        setClients(clts);
+        setEmployees(emps);
+      }).catch(() => {});
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Calendar navigation
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();

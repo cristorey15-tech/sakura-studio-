@@ -59,7 +59,9 @@ const emptyForm = {
 export default function EmpleadasPage() {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
-  const { data: employees = [], isLoading } = useApiQuery<Employee[]>(["empleadas"], "/api/empleadas");
+  const { data: employees = [], isLoading } = useApiQuery<Employee[]>(["empleadas"], "/api/empleadas", {
+    refetchInterval: 15000,
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);

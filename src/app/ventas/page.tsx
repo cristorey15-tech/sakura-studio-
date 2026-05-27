@@ -162,6 +162,28 @@ export default function VentasPage() {
   const [posSubmitting, setPosSubmitting] = useState(false);
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
 
+  // Silent polling cada 15s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const params = new URLSearchParams({ page: String(currentPage), limit: "15" });
+      if (search) params.set("q", search);
+      if (currencyFilter !== "ALL") params.set("currency", currencyFilter);
+      apiFetch<{ data: Sale[]; total: number; page: number; totalPages: number; stats: typeof salesStats }>(`/api/ventas?${params}`)
+        .then(({ data }) => {
+          if (data) {
+            setSales(data.data);
+            setCurrentPage(data.page);
+            setTotalPages(data.totalPages);
+            setTotalSales(data.total);
+            if (data.stats) setSalesStats(data.stats);
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [currentPage, search, currencyFilter]);
+
   // ─── Data Loaders ───
   const loadSales = (p: number, q?: string, currency?: string) => {
     const params = new URLSearchParams({ page: String(p), limit: "15" });

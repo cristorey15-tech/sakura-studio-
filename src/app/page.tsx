@@ -172,6 +172,21 @@ export default function Dashboard() {
     checkAttendanceStatus();
   }, [checkAttendanceStatus]);
 
+  // Silent polling cada 15s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      apiFetch<DashboardData>("/api/dashboard")
+        .then(({ data }) => {
+          if (data && typeof data === "object" && "totalClients" in data) {
+            setData(data);
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   if (loading) {
     return (
       <div className="animate-fadeIn flex flex-col gap-4 flex-1 min-h-0">

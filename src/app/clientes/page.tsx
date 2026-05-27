@@ -53,7 +53,8 @@ export default function ClientesPage() {
 
   const { data: pageData, isLoading } = useApiQuery<ClientsResponse>(
     ["clientes", page, querySearch],
-    `/api/clientes?${params}`
+    `/api/clientes?${params}`,
+    { refetchInterval: 15000 }
   );
 
   const clients = pageData?.data ?? [];
