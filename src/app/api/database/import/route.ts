@@ -276,6 +276,33 @@ export async function POST(request: Request) {
                 inserted,
               });
             }
+
+            // ── Reset auto-increment sequences (PostgreSQL) ──
+            // Después de insertar con IDs explícitos, las secuencias
+            // deben actualizarse para evitar conflictos al crear nuevos registros.
+            const TABLES_WITH_SEQUENCES = [
+              '"Service"',
+              '"Client"',
+              '"Employee"',
+              '"Product"',
+              '"WATemplate"',
+              '"StudioSettings"',
+              '"Appointment"',
+              '"Sale"',
+              '"SaleItem"',
+            ];
+
+            for (const table of TABLES_WITH_SEQUENCES) {
+              try {
+                await tx.$executeRawUnsafe(
+                  `SELECT setval(pg_get_serial_sequence('${table}', 'id'), COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1)`
+                );
+              } catch (seqErr) {
+                console.warn(`⚠️ Could not reset sequence for ${table}:`, seqErr);
+              }
+            }
+
+            send({ type: "status", message: "Secuencias actualizadas correctamente" });
           },
           { timeout: 60000 }
         );
