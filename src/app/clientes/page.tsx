@@ -154,20 +154,20 @@ export default function ClientesPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Nombre *</label>
-              <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="Nombre completo" />
+              <label htmlFor="client-name" className="block text-sm font-medium text-dark mb-1.5">Nombre *</label>
+              <input id="client-name" name="client-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="Nombre completo" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Teléfono</label>
-              <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input" placeholder="555-000-0000" />
+              <label htmlFor="client-phone" className="block text-sm font-medium text-dark mb-1.5">Teléfono</label>
+              <input id="client-phone" name="client-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input" placeholder="555-000-0000" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" placeholder="cliente@email.com" />
+              <label htmlFor="client-email" className="block text-sm font-medium text-dark mb-1.5">Email</label>
+              <input id="client-email" name="client-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" placeholder="cliente@email.com" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Notas</label>
-              <input type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input" placeholder="Notas adicionales" />
+              <label htmlFor="client-notes" className="block text-sm font-medium text-dark mb-1.5">Notas</label>
+              <input id="client-notes" name="client-notes" type="text" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input" placeholder="Notas adicionales" />
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
@@ -203,6 +203,9 @@ export default function ClientesPage() {
             }, 250);
           }}
           placeholder="Buscar clientes..."
+          id="client-search"
+          name="client-search"
+          aria-label="Buscar clientes"
           className="input pl-10 pr-10 py-3"
         />
         {search && (

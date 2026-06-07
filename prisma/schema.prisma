@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -53,19 +53,20 @@ model Appointment {
 }
 
 model Sale {
-  id            Int        @id @default(autoincrement())
-  date          DateTime   @default(now())
+  id            Int            @id @default(autoincrement())
+  date          DateTime       @default(now())
   total         Float
   totalBs       Float?
   exchangeRate  Float?
-  paymentMethod String?    // EFECTIVO, TARJETA, TRANSFERENCIA, PAGO MOVIL, OTRO
+  paymentMethod String?        // EFECTIVO, TARJETA, TRANSFERENCIA, PAGO MOVIL, OTRO (legacy)
   notes         String?
   clientId      Int?
   employeeId    Int?
-  client        Client?    @relation(fields: [clientId], references: [id])
-  employee      Employee?  @relation(fields: [employeeId], references: [id])
+  client        Client?        @relation(fields: [clientId], references: [id])
+  employee      Employee?      @relation(fields: [employeeId], references: [id])
   items         SaleItem[]
-  createdAt     DateTime   @default(now())
+  paymentSplits PaymentSplit[]
+  createdAt     DateTime       @default(now())
 }
 
 model SaleItem {
@@ -154,10 +155,31 @@ model Attendance {
 model AuditLog {
   id         Int      @id @default(autoincrement())
   action     String   // CREATE, UPDATE, DELETE
-  entity     String   // Service, Client, Employee, Sale, Appointment, Product, StudioSettings, WATemplate
+  entity     String   // Service, Client, Employee, Sale, Appointment, Product, StudioSettings, WATemplate, Expense
   entityId   Int?     // ID del registro afectado
   description String   // Descripción legible de la acción
   userId     String?  // ID del usuario que realizó la acción
   userName   String?  // Nombre del usuario
   createdAt  DateTime @default(now())
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  concept     String   // Descripción del gasto (ej: "Alquiler", "Compra de producto")
+  amount      Float    // Monto en USD
+  amountBs    Float?   // Monto en Bs (opcional)
+  category    String   // ALQUILER, SERVICIOS, PRODUCTOS, MANTENIMIENTO, SUELDO, OTRO
+  date        DateTime @default(now())
+  registeredBy String? // Nombre de quien registró
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model PaymentSplit {
+  id            Int    @id @default(autoincrement())
+  saleId        Int
+  paymentMethod String // EFECTIVO, TARJETA, TRANSFERENCIA, PAGO MOVIL, OTRO
+  amount        Float  // Monto en USD
+  amountBs      Float? // Monto en Bs (si aplica)
+  sale          Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 }

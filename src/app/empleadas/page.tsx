@@ -373,35 +373,37 @@ export default function EmpleadasPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Nombre</label>
-              <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="Nombre completo" />
+              <label htmlFor="emp-name" className="block text-sm font-medium text-dark mb-1.5">Nombre</label>
+              <input id="emp-name" name="emp-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="Nombre completo" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Rol</label>
-              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="select">
+              <label htmlFor="emp-role" className="block text-sm font-medium text-dark mb-1.5">Rol</label>
+              <select id="emp-role" name="emp-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="select">
                 {roles.map((role) => (
                   <option key={role} value={role}>{role}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Teléfono</label>
-              <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input" placeholder="555-0100" />
+              <label htmlFor="emp-phone" className="block text-sm font-medium text-dark mb-1.5">Teléfono</label>
+              <input id="emp-phone" name="emp-phone" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input" placeholder="555-0100" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" placeholder="email@ejemplo.com" />
+              <label htmlFor="emp-email" className="block text-sm font-medium text-dark mb-1.5">Email</label>
+              <input id="emp-email" name="emp-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" placeholder="email@ejemplo.com" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Fecha de inicio</label>
-              <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="input" />
+              <label htmlFor="emp-startDate" className="block text-sm font-medium text-dark mb-1.5">Fecha de inicio</label>
+              <input id="emp-startDate" name="emp-startDate" type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">
+              <label htmlFor="emp-password" className="block text-sm font-medium text-dark mb-1.5">
                 {editingId ? "Nueva Contraseña (dejar vacío para mantener)" : "Contraseña"}
               </label>
               <div className="relative">
                 <input
+                  id="emp-password"
+                  name="emp-password"
                   type={showPassword ? "text" : "password"}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -431,8 +433,8 @@ export default function EmpleadasPage() {
               <p className="text-[11px] text-muted mt-1">Mínimo 4 caracteres. Necesaria para que la empleada pueda iniciar sesión.</p>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-dark mb-1.5">Notas</label>
-              <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="input resize-none" placeholder="Notas adicionales..." />
+              <label htmlFor="emp-notes" className="block text-sm font-medium text-dark mb-1.5">Notas</label>
+              <textarea id="emp-notes" name="emp-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} className="input resize-none" placeholder="Notas adicionales..." />
             </div>
             {editingId && (
               <div className="md:col-span-2">

@@ -125,7 +125,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Selector de empleada */}
             <div>
-              <label className="block text-sm font-semibold text-dark/80 mb-2">
+              <label htmlFor="login-user" className="block text-sm font-semibold text-dark/80 mb-2">
                 Usuario
               </label>
               {fetching ? (
@@ -139,6 +139,8 @@ export default function LoginPage() {
               ) : (
                 <div className="relative">
                   <select
+                    id="login-user"
+                    name="login-user"
                     value={selectedId ?? ""}
                     onChange={(e) => {
                       setSelectedId(e.target.value ? Number(e.target.value) : null);
@@ -164,12 +166,14 @@ export default function LoginPage() {
 
             {/* Contraseña */}
             <div>
-              <label className="block text-sm font-semibold text-dark/80 mb-2">
+              <label htmlFor="login-password" className="block text-sm font-semibold text-dark/80 mb-2">
                 Contraseña
               </label>
               <div className="relative">
                 <input
                   ref={passwordRef}
+                  id="login-password"
+                  name="login-password"
                   type="password"
                   required
                   value={password}

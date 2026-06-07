@@ -2209,6 +2209,11 @@ export default function ReportesPage() {
                                 {new Date(sale.date).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
                               </span>
                             </td>
+                            <td className="py-3.5 pr-4 whitespace-nowrap">
+                              <span className="text-sm text-muted">
+                                {new Date(sale.date).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </td>
                             <td className="py-3.5 pr-4">
                               <span className="text-sm text-dark">{sale.clientName || "—"}</span>
                             </td>

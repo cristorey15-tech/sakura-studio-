@@ -24,21 +24,36 @@ export const POST = withCsrf(async (req: NextRequest) => {
   if (auth.error) return auth.error;
   try {
     const body = await req.json();
-    const { clientId, employeeId, paymentMethod, exchangeRate, totalBs, items } = body;
+    const { clientId, employeeId, paymentMethod, exchangeRate, totalBs, items, paymentSplits } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: "Debes seleccionar al menos un servicio" }, { status: 400 });
+      return NextResponse.json({ error: "Debes seleccionar al menos un servicio o producto" }, { status: 400 });
     }
 
-    // Obtener los IDs de servicios
-    const serviceIds = items.map((item: { serviceId: number }) => Number(item.serviceId));
+    // Separate services and products
+    const serviceIds = items.filter((item: any) => item.serviceId).map((item: any) => Number(item.serviceId));
+    const productIds = items.filter((item: any) => item.productId).map((item: any) => Number(item.productId));
 
-    const services = await prisma.service.findMany({
-      where: { id: { in: serviceIds }, active: true },
-    });
+    const [services, products] = await Promise.all([
+      serviceIds.length > 0 ? prisma.service.findMany({ where: { id: { in: serviceIds }, active: true } }) : [],
+      productIds.length > 0 ? prisma.product.findMany({ where: { id: { in: productIds }, quantity: { gt: 0 } } }) : [],
+    ]);
 
-    if (services.length === 0) {
-      return NextResponse.json({ error: "Servicios no encontrados o inactivos" }, { status: 404 });
+    // Validate all requested items exist
+    const foundServiceIds = new Set(services.map(s => s.id));
+    const foundProductIds = new Set(products.map(p => p.id));
+    const missingServices = serviceIds.filter((id: number) => !foundServiceIds.has(id));
+    const missingProducts = productIds.filter((id: number) => !foundProductIds.has(id));
+    if (missingServices.length > 0 || missingProducts.length > 0) {
+      return NextResponse.json({ error: "Servicios o productos no encontrados, inactivos o sin stock" }, { status: 404 });
+    }
+
+    // Check stock for products
+    for (const item of items.filter((i: any) => i.productId)) {
+      const product = products.find(p => p.id === Number(item.productId));
+      if (product && product.quantity < (item.quantity || 1)) {
+        return NextResponse.json({ error: `Stock insuficiente para "${product.name}" (disponible: ${product.quantity})` }, { status: 400 });
+      }
     }
 
     // Determinar cliente
@@ -48,9 +63,17 @@ export const POST = withCsrf(async (req: NextRequest) => {
       finalClientId = walkin.id;
     }
 
-    // Construir items con precios personalizados (usar el enviado, o el default del servicio)
-    const saleItems = items.map((item: { serviceId: number; price?: number }) => {
-      const service = services.find((s) => s.id === Number(item.serviceId));
+    // Build sale items with prices from services or products
+    const saleItems = items.map((item: any) => {
+      if (item.productId) {
+        const product = products.find(p => p.id === Number(item.productId));
+        return {
+          quantity: item.quantity || 1,
+          price: item.price ?? product?.price ?? 0,
+          productId: product?.id,
+        };
+      }
+      const service = services.find(s => s.id === Number(item.serviceId));
       return {
         quantity: 1,
         price: item.price ?? service?.price ?? 0,
@@ -58,24 +81,86 @@ export const POST = withCsrf(async (req: NextRequest) => {
       };
     });
 
-    const total = saleItems.reduce((sum: number, item: { price: number }) => sum + item.price, 0);
+    const total = saleItems.reduce((sum: number, item: { price: number; quantity: number }) => sum + item.price * item.quantity, 0);
 
-    // Crear la venta con items
-    const sale = await prisma.sale.create({
-      data: {
-        total,
-        paymentMethod: paymentMethod || "EFECTIVO",
-        exchangeRate: exchangeRate || null,
-        totalBs: totalBs || null,
-        clientId: finalClientId,
-        employeeId: employeeId ? Number(employeeId) : null,
-        items: { create: saleItems },
-      },
-      include: {
-        client: true,
-        employee: true,
-        items: { include: { service: true } },
-      },
+    const serviceDate = body.serviceDate
+      ? (() => {
+          const [y, m, d] = body.serviceDate.split("-").map(Number);
+          return new Date(y, m - 1, d, 12, 0, 0);
+        })()
+      : new Date();
+
+    // Create sale + deduct stock + create completed appointments atomically
+    const sale = await prisma.$transaction(async (tx) => {
+      const s = await tx.sale.create({
+        data: {
+          total,
+          paymentMethod: paymentSplits && paymentSplits.length > 0 ? null : (paymentMethod || "EFECTIVO"),
+          exchangeRate: exchangeRate || null,
+          totalBs: totalBs || null,
+          clientId: finalClientId,
+          employeeId: employeeId ? Number(employeeId) : null,
+          items: { create: saleItems },
+          ...(paymentSplits && paymentSplits.length > 0 ? {
+            paymentSplits: {
+              create: paymentSplits.map((split: { paymentMethod: string; amount: number; amountBs?: number }) => ({
+                paymentMethod: split.paymentMethod,
+                amount: Number(split.amount),
+                amountBs: split.amountBs ? Number(split.amountBs) : null,
+              })),
+            },
+          } : {}),
+        },
+        include: {
+          client: true,
+          employee: true,
+          items: { include: { service: true } },
+          paymentSplits: true,
+        },
+      });
+
+      // Create completed appointments for each service (to track service flow)
+      if (body.appointmentId) {
+        // Update existing appointment from agenda instead of creating duplicate
+        await tx.appointment.update({
+          where: { id: Number(body.appointmentId) },
+          data: {
+            status: "COMPLETADA",
+            employeeId: employeeId ? Number(employeeId) : null,
+          },
+        });
+      } else {
+        for (const item of saleItems) {
+          if (item.serviceId) {
+            await tx.appointment.create({
+              data: {
+                date: serviceDate,
+                status: "COMPLETADA",
+                notes: "Venta rápida",
+                clientId: finalClientId,
+                employeeId: employeeId ? Number(employeeId) : null,
+                serviceId: item.serviceId,
+              },
+            });
+          }
+        }
+      }
+
+      // Deduct stock atomically with conditional check
+      for (const item of items.filter((i: any) => i.productId)) {
+        const qty = item.quantity || 1;
+        const pid = Number(item.productId);
+        const updated = await tx.$executeRaw`
+          UPDATE "Product" SET quantity = quantity - ${qty}
+          WHERE id = ${pid} AND quantity >= ${qty}
+        `;
+        if (updated === 0) {
+          const p = products.find((pp: any) => pp.id === pid);
+          throw new Error(`Stock insuficiente para "${p?.name || "producto"}" (disponible: ${p?.quantity ?? 0})`);
+        }
+      }
+
+      return s;
     });
 
     // Audit log

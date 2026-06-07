@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { likePattern, removeAccentsSql } from "@/lib/search";
 
 export async function GET(request: Request) {
   try {
@@ -10,44 +12,40 @@ export async function GET(request: Request) {
       return NextResponse.json({ clients: [], services: [], employees: [] });
     }
 
+    const pattern = likePattern(q);
+
+    // Accent-insensitive search across Client, Service, Employee tables
+    const nameSql = (col: string) => Prisma.raw(removeAccentsSql(col));
     const [clients, services, employees] = await Promise.all([
-      prisma.client.findMany({
-        where: {
-          OR: [
-            { name: { contains: q } },
-            { phone: { contains: q } },
-            { email: { contains: q } },
-          ],
-        },
-        take: 5,
-        orderBy: { name: "asc" },
-      }),
-      prisma.service.findMany({
-        where: {
-          active: true,
-          OR: [
-            { name: { contains: q } },
-            { category: { contains: q } },
-          ],
-        },
-        take: 5,
-        orderBy: { name: "asc" },
-      }),
-      prisma.employee.findMany({
-        where: {
-          active: true,
-          OR: [
-            { name: { contains: q } },
-            { role: { contains: q } },
-          ],
-        },
-        take: 5,
-        orderBy: { name: "asc" },
-      }),
+      prisma.$queryRaw<any[]>`
+        SELECT * FROM "Client"
+        WHERE ${nameSql("name")} LIKE ${Prisma.raw(pattern)}
+           OR ${nameSql("phone")} LIKE ${Prisma.raw(pattern)}
+           OR ${nameSql("email")} LIKE ${Prisma.raw(pattern)}
+        ORDER BY name ASC
+        LIMIT 5
+      `,
+      prisma.$queryRaw<any[]>`
+        SELECT * FROM "Service"
+        WHERE active = 1
+          AND (${nameSql("name")} LIKE ${Prisma.raw(pattern)}
+               OR ${nameSql("category")} LIKE ${Prisma.raw(pattern)})
+        ORDER BY name ASC
+        LIMIT 5
+      `,
+      prisma.$queryRaw<any[]>`
+        SELECT * FROM "Employee"
+        WHERE active = 1
+          AND (${nameSql("name")} LIKE ${Prisma.raw(pattern)}
+               OR ${nameSql("role")} LIKE ${Prisma.raw(pattern)})
+        ORDER BY name ASC
+        LIMIT 5
+      `,
     ]);
 
     return NextResponse.json({ clients, services, employees });
   } catch (error) {
+    console.error("Search error:", error);
     return NextResponse.json(
       { error: "Error en la búsqueda" },
       { status: 500 }

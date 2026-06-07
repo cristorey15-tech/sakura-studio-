@@ -159,36 +159,36 @@ export default function ServiciosPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Nombre</label>
-              <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="Nombre del servicio" />
+              <label htmlFor="service-name" className="block text-sm font-medium text-dark mb-1.5">Nombre</label>
+              <input id="service-name" name="service-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input" placeholder="Nombre del servicio" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Categoría</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="select">
+              <label htmlFor="service-category" className="block text-sm font-medium text-dark mb-1.5">Categoría</label>
+              <select id="service-category" name="service-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="select">
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Precio ($)</label>
-              <input type="number" required min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="input" placeholder="0.00" />
+              <label htmlFor="service-price" className="block text-sm font-medium text-dark mb-1.5">Precio ($)</label>
+              <input id="service-price" name="service-price" type="number" required min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} className="input" placeholder="0.00" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Duración (min)</label>
-              <input type="number" required min="15" step="5" value={form.duration} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })} className="input" />
+              <label htmlFor="service-duration" className="block text-sm font-medium text-dark mb-1.5">Duración (min)</label>
+              <input id="service-duration" name="service-duration" type="number" required min="15" step="5" value={form.duration} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })} className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark mb-1.5">Comisión empleada (%)</label>
+              <label htmlFor="service-commission" className="block text-sm font-medium text-dark mb-1.5">Comisión empleada (%)</label>
               <div className="relative">
-                <input type="number" min="0" max="100" step="1" value={form.commissionPercent} onChange={(e) => setForm({ ...form, commissionPercent: Number(e.target.value) })} className="input pr-8" />
+                <input id="service-commission" name="service-commission" type="number" min="0" max="100" step="1" value={form.commissionPercent} onChange={(e) => setForm({ ...form, commissionPercent: Number(e.target.value) })} className="input pr-8" />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted font-medium">%</span>
               </div>
               <p className="text-xs text-muted/70 mt-1">Porcentaje del precio que va a la empleada</p>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-dark mb-1.5">Descripción</label>
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="input resize-none" placeholder="Descripción del servicio..." />
+              <label htmlFor="service-description" className="block text-sm font-medium text-dark mb-1.5">Descripción</label>
+              <textarea id="service-description" name="service-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className="input resize-none" placeholder="Descripción del servicio..." />
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import WAChatPopover from "@/components/WAChatPopover";
 import WATemplateManager from "@/components/WATemplateManager";
 import Pagination from "@/components/Pagination";
@@ -9,6 +9,9 @@ import { useToast } from "@/hooks/useToast";
 import { apiFetch } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ClientSelect from "@/components/ClientSelect";
+import QuickCreateClient from "@/components/QuickCreateClient";
+import QuickCreateService from "@/components/QuickCreateService";
 
 type ViewMode = "list" | "pos";
 
@@ -65,6 +68,7 @@ interface PendingSale {
   serviceName: string;
   servicePrice: number;
   appointmentDate: string;
+  appointmentId?: number;
 }
 
 interface Sale {
@@ -142,6 +146,7 @@ export default function VentasPage() {
     notes: "",
     items: [] as FormItem[],
   });
+  const [pendingAppointmentId, setPendingAppointmentId] = useState<number | null>(null);
   const [salesStats, setSalesStats] = useState({
     todaySalesCount: 0,
     todayTotalUSD: 0,
@@ -162,6 +167,19 @@ export default function VentasPage() {
   const [posExchangeRate, setPosExchangeRate] = useState("");
   const [posSubmitting, setPosSubmitting] = useState(false);
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
+  const [posServiceDate, setPosServiceDate] = useState(todayStr);
+
+  // ─── Split Payment State ───
+  const [posSplitMode, setPosSplitMode] = useState(false);
+  const [posSplits, setPosSplits] = useState<Array<{ method: string; amount: string; amountBs: string }>>([
+    { method: "EFECTIVO", amount: "", amountBs: "" },
+  ]);
+
+  // ─── Quick Create Modals ───
+  const [showQuickClient, setShowQuickClient] = useState(false);
+  const [showQuickService, setShowQuickService] = useState(false);
+  const [quickCreateTarget, setQuickCreateTarget] = useState<"list" | "pos">("list");
+  const [clientRefreshTrigger, setClientRefreshTrigger] = useState(0);
 
   // Silent polling cada 15s
   useEffect(() => {
@@ -207,7 +225,7 @@ export default function VentasPage() {
   const loadFormData = () => {
     Promise.all([
       apiFetch<Service[]>("/api/servicios").then(({ data }) => data || []),
-      apiFetch<{ data: Client[] }>("/api/clientes").then(({ data }) => data?.data || []),
+      apiFetch<{ data: Client[] }>("/api/clientes?limit=500").then(({ data }) => data?.data || []),
       apiFetch<Employee[]>("/api/empleadas").then(({ data }) => data || []),
     ]).then(([s, c, e]) => {
       const activeSv = (s as Service[]).filter((sv) => sv.active);
@@ -235,6 +253,7 @@ export default function VentasPage() {
         setFromAppointmentInfo(`🧾 ${pending.serviceName} — ${pending.clientName}`);
         const aptDate = new Date(pending.appointmentDate);
         const aptDateStr = `${aptDate.getFullYear()}-${String(aptDate.getMonth() + 1).padStart(2, "0")}-${String(aptDate.getDate()).padStart(2, "0")}`;
+        setPendingAppointmentId(pending.appointmentId ?? null);
         setForm({
           clientId: String(pending.clientId),
           employeeId: "",
@@ -308,6 +327,7 @@ export default function VentasPage() {
           price: Number(item.price),
           serviceId: item.serviceId ? Number(item.serviceId) : null,
         })),
+        appointmentId: pendingAppointmentId || undefined,
       }),
     });
 
@@ -315,6 +335,7 @@ export default function VentasPage() {
       showToast("success", "Venta registrada exitosamente");
       setShowForm(false);
       setFromAppointmentInfo(null);
+      setPendingAppointmentId(null);
       resetForm();
       setListLoading(true);
       loadSales(1, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined);
@@ -374,34 +395,76 @@ export default function VentasPage() {
     ));
   };
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCartItems([]);
     setPosStep("services");
     setPosExchangeRate("");
-  };
+    setPosSplitMode(false);
+    setPosSplits([{ method: "EFECTIVO", amount: "", amountBs: "" }]);
+  }, []);
 
   const posTotal = cartItems.reduce((sum, item) => sum + item.price, 0);
   const posNeedsRate = methodsRequiringRate.includes(posPaymentMethod);
+  const posSplitNeedsRate = posSplitMode && posSplits.some((s) => methodsRequiringRate.includes(s.method));
+  const posShowRate = posNeedsRate || posSplitNeedsRate;
   const posExchangeRateNum = Number(posExchangeRate);
-  const posTotalBs = posNeedsRate && posExchangeRateNum > 0 ? posTotal * posExchangeRateNum : 0;
+  const posTotalBs = posShowRate && posExchangeRateNum > 0 ? posTotal * posExchangeRateNum : 0;
+
+  // Split payment helpers
+  const posSplitsTotal = posSplits.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const posSplitsRemaining = Math.max(0, posTotal - posSplitsTotal);
+  const posSplitsValid = posSplitMode
+    ? posSplits.length > 0 && posSplits.every((s) => s.method && Number(s.amount) > 0) && Math.abs(posSplitsTotal - posTotal) < 0.01
+    : true;
+
+  const addSplitRow = () => {
+    setPosSplits([...posSplits, { method: "EFECTIVO", amount: posSplitsRemaining > 0 ? posSplitsRemaining.toFixed(2) : "", amountBs: "" }]);
+  };
+
+  const removeSplitRow = (idx: number) => {
+    if (posSplits.length <= 1) return;
+    setPosSplits(posSplits.filter((_, i) => i !== idx));
+  };
+
+  const updateSplitRow = (idx: number, field: "method" | "amount" | "amountBs", value: string) => {
+    const updated = [...posSplits];
+    updated[idx] = { ...updated[idx], [field]: value };
+    setPosSplits(updated);
+  };
 
   const handlePosCheckout = async () => {
     if (cartItems.length === 0) return;
+    if (posSplitMode && !posSplitsValid) {
+      showToast("error", "Los montos de los splits deben sumar el total exacto");
+      return;
+    }
     setPosSubmitting(true);
+
+    const salePayload: Record<string, unknown> = {
+      clientId: posClientId || null,
+      employeeId: posEmployeeId || null,
+      exchangeRate: posExchangeRateNum > 0 ? posExchangeRateNum : null,
+      totalBs: posTotalBs > 0 ? posTotalBs : null,
+      serviceDate: posServiceDate || null,
+      items: cartItems.map((item) => ({
+        serviceId: item.id,
+        price: item.price,
+      })),
+    };
+
+    if (posSplitMode && posSplits.length > 0) {
+      salePayload.paymentSplits = posSplits.map((s) => ({
+        paymentMethod: s.method,
+        amount: Number(s.amount),
+        amountBs: Number(s.amountBs) > 0 ? Number(s.amountBs) : undefined,
+      }));
+    } else {
+      salePayload.paymentMethod = posPaymentMethod;
+    }
 
     const { data, error: apiError } = await apiFetch("/api/ventas/quick", {
       method: "POST",
-      body: JSON.stringify({
-        clientId: posClientId || null,
-        employeeId: posEmployeeId || null,
-        paymentMethod: posPaymentMethod,
-        exchangeRate: posExchangeRateNum > 0 ? posExchangeRateNum : null,
-        totalBs: posTotalBs > 0 ? posTotalBs : null,
-        items: cartItems.map((item) => ({
-          serviceId: item.id,
-          price: item.price,
-        })),
-      }),
+      body: JSON.stringify(salePayload),
     });
 
     if (data) {
@@ -411,13 +474,35 @@ export default function VentasPage() {
       setPosEmployeeId("");
       setPosPaymentMethod("EFECTIVO");
       setPosExchangeRate("");
-      // Refresh list stats if user switches back
+      setPosServiceDate(todayStr);
+      setPosSplitMode(false);
+      setPosSplits([{ method: "EFECTIVO", amount: "", amountBs: "" }]);
       loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined);
     } else {
       showToast("error", apiError || "Error al procesar la venta");
     }
     setPosSubmitting(false);
   };
+
+  // ─── Keyboard shortcuts for POS ───
+  useEffect(() => {
+    if (viewMode !== "pos" || showQuickClient || showQuickService) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not in an input
+      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "SELECT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
+      const catMap: Record<string, string> = { F1: "GENERAL", F2: "MAQUILLAJE", F3: "CEJAS", F4: "PESTAÑAS", F5: "MANICURE" };
+      if (catMap[e.key]) {
+        e.preventDefault();
+        setActiveCategory(catMap[e.key]);
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        clearCart();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [viewMode, showQuickClient, showQuickService, clearCart]);
 
   const loading = sharedLoading || (viewMode === "list" && listLoading && sales.length === 0);
 
@@ -443,6 +528,34 @@ export default function VentasPage() {
   }
 
   return (
+    <>
+    <QuickCreateClient
+      isOpen={showQuickClient}
+      onClose={() => setShowQuickClient(false)}
+      onCreated={(client) => {
+        if (quickCreateTarget === "list") {
+          setForm({ ...form, clientId: String(client.id) });
+          setClients((prev) => [...prev, { id: client.id, name: client.name, phone: client.phone, freeServiceAvailable: false }]);
+        } else {
+          setPosClientId(String(client.id));
+          setClients((prev) => [...prev, { id: client.id, name: client.name, phone: client.phone, freeServiceAvailable: false }]);
+        }
+        setClientRefreshTrigger((t) => t + 1);
+      }}
+    />
+    <QuickCreateService
+      isOpen={showQuickService}
+      onClose={() => setShowQuickService(false)}
+      onCreated={(service) => {
+        setServices((prev) => [...prev, service]);
+        if (quickCreateTarget === "list") {
+          const items = [...form.items, { serviceId: String(service.id), price: service.price }];
+          setForm({ ...form, items });
+        } else {
+          addToCart(service);
+        }
+      }}
+    />
     <div className="space-y-5 animate-fadeIn">
       {/* ═══════════ HEADER + MODE TOGGLE ═══════════ */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -599,16 +712,17 @@ export default function VentasPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-dark mb-1.5">Cliente (opcional)</label>
-                  <select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} className="select">
-                    <option value="">Sin cliente</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <ClientSelect
+                    value={form.clientId}
+                    onChange={(id) => setForm({ ...form, clientId: id })}
+                    onQuickCreate={() => { setQuickCreateTarget("list"); setShowQuickClient(true); }}
+                    placeholder="Sin cliente"
+                    refreshTrigger={clientRefreshTrigger}
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-dark mb-1.5">Atendió</label>
-                  <select value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="select">
+                  <label htmlFor="sale-employee" className="block text-sm font-medium text-dark mb-1.5">Atendió</label>
+                  <select id="sale-employee" name="sale-employee" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="select">
                     <option value="">Seleccionar empleada...</option>
                     {employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>{emp.name}</option>
@@ -616,12 +730,12 @@ export default function VentasPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-dark mb-1.5">Fecha del servicio</label>
-                  <input type="date" value={form.serviceDate} onChange={(e) => setForm({ ...form, serviceDate: e.target.value })} className="input" />
+                  <label htmlFor="sale-serviceDate" className="block text-sm font-medium text-dark mb-1.5">Fecha del servicio</label>
+                  <input id="sale-serviceDate" name="sale-serviceDate" type="date" value={form.serviceDate} onChange={(e) => setForm({ ...form, serviceDate: e.target.value })} className="input" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-dark mb-1.5">Método de Pago</label>
-                  <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="select">
+                  <label htmlFor="sale-paymentMethod" className="block text-sm font-medium text-dark mb-1.5">Método de Pago</label>
+                  <select id="sale-paymentMethod" name="sale-paymentMethod" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="select">
                     {paymentMethods.map((m) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
@@ -641,6 +755,8 @@ export default function VentasPage() {
                     <div className="relative flex-1 max-w-xs">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-medium">Bs</span>
                       <input
+                        id="sale-exchangeRate"
+                        name="sale-exchangeRate"
                         type="number"
                         required
                         min="0"
@@ -668,7 +784,11 @@ export default function VentasPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-dark">Servicios</label>
-                  <button type="button" onClick={addItem} className="text-xs text-primary hover:text-primary-dark transition-colors font-medium">+ Agregar servicio</button>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => { setQuickCreateTarget("list"); setShowQuickService(true); }} className="text-xs text-violet-600 hover:text-violet-700 transition-colors font-medium">+ Nuevo servicio</button>
+                    <span className="text-border">·</span>
+                    <button type="button" onClick={addItem} className="text-xs text-primary hover:text-primary-dark transition-colors font-medium">+ Agregar a la venta</button>
+                  </div>
                 </div>
                 {form.items.length === 0 ? (
                   <p className="text-sm text-muted text-center py-4 border border-dashed border-border rounded-lg bg-surface">Agrega servicios a la venta</p>
@@ -971,29 +1091,34 @@ export default function VentasPage() {
                     </svg>
                     Carrito
                   </h2>
-                  {cartItems.length > 0 && (
-                    <button onClick={clearCart} className="text-xs text-muted hover:text-danger transition-colors">
-                      Vaciar
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setQuickCreateTarget("pos"); setShowQuickService(true); }}
+                      className="text-xs text-violet-600 hover:text-violet-700 transition-colors font-medium"
+                    >
+                      + Nuevo servicio
                     </button>
-                  )}
+                    {cartItems.length > 0 && (
+                      <button onClick={clearCart} className="text-xs text-muted hover:text-danger transition-colors">
+                        Vaciar
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Cliente & Empleada */}
                 <div className="space-y-2">
                   <div>
                     <label className="text-xs font-medium text-muted mb-1 block">Cliente</label>
-                    <select
+                    <ClientSelect
                       value={posClientId}
-                      onChange={(e) => setPosClientId(e.target.value)}
-                      className="select text-sm py-2"
-                    >
-                      <option value="">🧑 Cliente de Paso</option>
-                      {clients.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}{c.freeServiceAvailable ? ' 🎁' : ''}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(id) => setPosClientId(id)}
+                      onQuickCreate={() => { setQuickCreateTarget("pos"); setShowQuickClient(true); }}
+                      placeholder="🧑 Cliente de Paso"
+                      showHistory={false}
+                      refreshTrigger={clientRefreshTrigger}
+                    />
                     {posClientId && (() => {
                       const selectedClient = clients.find(c => String(c.id) === posClientId);
                       if (!selectedClient || !selectedClient.freeServiceAvailable) return null;
@@ -1107,37 +1232,165 @@ export default function VentasPage() {
                 {/* Payment method */}
                 {cartItems.length > 0 && (
                   <div>
-                    <label className="text-xs font-medium text-muted mb-1 block">Método de pago</label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {paymentMethods.slice(0, 3).map((method) => (
-                        <button
-                          key={method}
-                          onClick={() => setPosPaymentMethod(method)}
-                          className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                            posPaymentMethod === method
-                              ? "bg-primary text-white shadow-sm"
-                              : "bg-surface text-muted hover:text-dark border border-border"
-                          }`}
-                        >
-                          {method}
-                        </button>
-                      ))}
-                      <select
-                        value={paymentMethods.slice(3).includes(posPaymentMethod) ? posPaymentMethod : ""}
-                        onChange={(e) => e.target.value && setPosPaymentMethod(e.target.value)}
-                        className="select text-xs py-1.5 col-span-3"
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-medium text-muted block">
+                        {posSplitMode ? "Métodos de pago (dividido)" : "Método de pago"}
+                      </label>
+                      <button
+                        onClick={() => {
+                          setPosSplitMode(!posSplitMode);
+                          if (!posSplitMode) {
+                            // Entering split mode: pre-fill first row with total
+                            setPosSplits([{ method: posPaymentMethod, amount: posTotal.toFixed(2), amountBs: "" }]);
+                          }
+                        }}
+                        className={`text-[11px] font-medium px-2 py-1 rounded-lg transition-all duration-200 ${
+                          posSplitMode
+                            ? "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                            : "text-muted hover:text-dark hover:bg-surface border border-transparent"
+                        }`}
                       >
-                        <option value="">Otro...</option>
-                        {paymentMethods.slice(3).map((method) => (
-                          <option key={method} value={method}>{method}</option>
-                        ))}
-                      </select>
+                        {posSplitMode ? "🔓 Dividido" : "🔀 Dividir pago"}
+                      </button>
                     </div>
+
+                    {posSplitMode ? (
+                      /* ─── Split Payment Rows ─── */
+                      <div className="space-y-2">
+                        {posSplits.map((split, idx) => {
+                          const splitNeedsRate = methodsRequiringRate.includes(split.method);
+                          return (
+                            <div key={idx} className="animate-scaleIn space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  value={split.method}
+                                  onChange={(e) => updateSplitRow(idx, "method", e.target.value)}
+                                  className="select text-xs py-1.5 flex-1"
+                                >
+                                  {paymentMethods.map((m) => (
+                                    <option key={m} value={m}>{m}</option>
+                                  ))}
+                                </select>
+                                <div className="relative w-24">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium">$</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={split.amount}
+                                    onChange={(e) => updateSplitRow(idx, "amount", e.target.value)}
+                                    className="w-full pl-6 pr-1.5 py-1.5 text-xs font-medium text-dark bg-white border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    placeholder="0.00"
+                                  />
+                                </div>
+                                <button
+                                  onClick={() => removeSplitRow(idx)}
+                                  disabled={posSplits.length <= 1}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-danger hover:bg-danger-bg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                  title="Quitar método"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                              {splitNeedsRate && (
+                                <div className="flex items-center gap-1.5 ml-0">
+                                  <span className="text-[10px] text-amber-600 font-medium whitespace-nowrap">Bs</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={split.amountBs}
+                                    onChange={(e) => updateSplitRow(idx, "amountBs", e.target.value)}
+                                    className="flex-1 pl-5 pr-1.5 py-1 text-[11px] font-medium text-amber-800 bg-amber-50/50 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200/50"
+                                    placeholder="Monto en Bs"
+                                  />
+                                  {posExchangeRateNum > 0 && Number(split.amount) > 0 && (
+                                    <span className="text-[10px] text-amber-600 whitespace-nowrap">
+                                      ≈ Bs {(Number(split.amount) * posExchangeRateNum).toFixed(2)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={addSplitRow}
+                            className="text-[11px] text-primary hover:text-primary-dark font-medium transition-colors flex items-center gap-1"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Agregar método
+                          </button>
+                          <div className="text-right">
+                            <p className="text-[10px] text-muted">
+                              Restante: <span className={`font-bold ${
+                                posSplitsRemaining > 0.01 ? "text-amber-600" : posSplitsValid ? "text-emerald-600" : "text-danger"
+                              }`}>
+                                ${posSplitsRemaining.toFixed(2)}
+                              </span>
+                            </p>
+                            <p className="text-[10px] text-muted">
+                              Asignado: <span className="font-medium text-dark">${posSplitsTotal.toFixed(2)}</span> / <span className="font-medium">${posTotal.toFixed(2)}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {posSplitsValid && posSplitMode && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Montos correctos ✓
+                          </div>
+                        )}
+                        {!posSplitsValid && posSplitMode && posSplitsTotal > 0 && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-amber-600 font-medium">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+                            </svg>
+                            Los montos deben sumar ${posTotal.toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* ─── Single Payment Method ─── */
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {paymentMethods.slice(0, 3).map((method) => (
+                          <button
+                            key={method}
+                            onClick={() => setPosPaymentMethod(method)}
+                            className={`px-2 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
+                              posPaymentMethod === method
+                                ? "bg-primary text-white shadow-sm"
+                                : "bg-surface text-muted hover:text-dark border border-border"
+                            }`}
+                          >
+                            {method}
+                          </button>
+                        ))}
+                        <select
+                          value={paymentMethods.slice(3).includes(posPaymentMethod) ? posPaymentMethod : ""}
+                          onChange={(e) => e.target.value && setPosPaymentMethod(e.target.value)}
+                          className="select text-xs py-1.5 col-span-3"
+                        >
+                          <option value="">Otro...</option>
+                          {paymentMethods.slice(3).map((method) => (
+                            <option key={method} value={method}>{method}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Tasa de Cambio (solo para TARJETA, TRANSFERENCIA, PAGO MOVIL) */}
-                {posNeedsRate && cartItems.length > 0 && (
+                {/* Tasa de Cambio (solo para TARJETA, TRANSFERENCIA, PAGO MOVIL — single o split) */}
+                {posShowRate && cartItems.length > 0 && (
                   <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 space-y-2">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-amber-800">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -1171,6 +1424,19 @@ export default function VentasPage() {
                   </div>
                 )}
 
+                {/* Fecha del servicio */}
+                {cartItems.length > 0 && (
+                  <div>
+                    <label className="text-xs font-medium text-muted mb-1 block">Fecha del servicio</label>
+                    <input
+                      type="date"
+                      value={posServiceDate}
+                      onChange={(e) => setPosServiceDate(e.target.value)}
+                      className="input text-sm py-2"
+                    />
+                  </div>
+                )}
+
                 {/* Total */}
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <div>
@@ -1188,7 +1454,7 @@ export default function VentasPage() {
                 {/* Cobrar button */}
                 <button
                   onClick={handlePosCheckout}
-                  disabled={cartItems.length === 0 || posSubmitting}
+                  disabled={cartItems.length === 0 || posSubmitting || (posSplitMode && !posSplitsValid)}
                   className={`w-full py-3 px-4 rounded-xl text-sm font-bold text-white transition-all duration-200 shadow-sm ${
                     cartItems.length === 0
                       ? "bg-gray-300 cursor-not-allowed"
@@ -1223,5 +1489,6 @@ export default function VentasPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

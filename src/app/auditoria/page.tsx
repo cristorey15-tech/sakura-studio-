@@ -93,8 +93,10 @@ export default function AuditLogPage() {
       <div className="card p-4">
         <div className="flex flex-wrap gap-3">
           <div className="flex-1 min-w-[160px]">
-            <label className="block text-xs font-medium text-muted mb-1.5">Entidad</label>
+            <label htmlFor="audit-entity" className="block text-xs font-medium text-muted mb-1.5">Entidad</label>
             <select
+              id="audit-entity"
+              name="audit-entity"
               value={filterEntity}
               onChange={(e) => { setFilterEntity(e.target.value); setPage(1); }}
               className="select"
@@ -106,8 +108,10 @@ export default function AuditLogPage() {
             </select>
           </div>
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs font-medium text-muted mb-1.5">Acción</label>
+            <label htmlFor="audit-action" className="block text-xs font-medium text-muted mb-1.5">Acción</label>
             <select
+              id="audit-action"
+              name="audit-action"
               value={filterAction}
               onChange={(e) => { setFilterAction(e.target.value); setPage(1); }}
               className="select"

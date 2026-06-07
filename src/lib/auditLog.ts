@@ -10,7 +10,8 @@ type AuditEntity =
   | "Product"
   | "StudioSettings"
   | "WATemplate"
-  | "Database";
+  | "Database"
+  | "Expense";
 
 interface AuditLogInput {
   action: AuditAction;

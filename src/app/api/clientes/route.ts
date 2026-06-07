@@ -4,14 +4,51 @@ import { withCsrf } from "@/lib/withCsrf";
 import { getUserFromCookie } from "@/lib/jwt";
 import { createAuditLog } from "@/lib/auditLog";
 import { requireWriteAdmin } from "@/lib/requireRole";
+import { Prisma } from "@prisma/client";
+import { likePattern, removeAccentsSql } from "@/lib/search";
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10", 10)));
+    const limit = Math.min(500, Math.max(1, parseInt(searchParams.get("limit") || "10", 10)));
     const skip = (page - 1) * limit;
+    const q = searchParams.get("q")?.trim() || "";
 
+    if (q) {
+      // Accent-insensitive + case-insensitive search using raw SQL
+      const pattern = likePattern(q);
+      const nameCol = removeAccentsSql("name");
+      const phoneCol = removeAccentsSql("phone");
+      const emailCol = removeAccentsSql("email");
+      const whereClause = `(${nameCol} LIKE ${pattern} OR ${phoneCol} LIKE ${pattern} OR ${emailCol} LIKE ${pattern})`;
+
+      const nameSql = (col: string) => Prisma.raw(removeAccentsSql(col));
+      const rawPattern = Prisma.raw(pattern);
+      const sql = Prisma.raw(whereClause);
+      const [clients, countResult] = await Promise.all([
+        prisma.$queryRaw<any[]>`
+          SELECT * FROM "Client"
+          WHERE ${sql}
+          ORDER BY name ASC
+          LIMIT ${limit} OFFSET ${skip}
+        `,
+        prisma.$queryRaw<[{ count: number }]>`
+          SELECT COUNT(*) as count FROM "Client"
+          WHERE ${sql}
+        `,
+      ]);
+
+      return NextResponse.json({
+        data: clients,
+        total: Number(countResult[0]?.count ?? 0),
+        page,
+        limit,
+        totalPages: Math.ceil(Number(countResult[0]?.count ?? 0) / limit),
+      });
+    }
+
+    // No search term — return all clients
     const [clients, total] = await Promise.all([
       prisma.client.findMany({
         skip,

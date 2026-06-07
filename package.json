@@ -13,7 +13,7 @@
     "setup": "npm install && npm run db:setup"
   },
   "dependencies": {
-    "@prisma/client": "^6.1.0",
+    "@prisma/client": "^6.19.3",
     "@tanstack/react-query": "^5.100.14",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",

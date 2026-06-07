@@ -103,7 +103,7 @@ export default function AgendaPage() {
     Promise.all([
       apiFetch<Appointment[]>("/api/citas").then(({ data }) => Array.isArray(data) ? data : []),
       apiFetch<Service[]>("/api/servicios").then(({ data }) => Array.isArray(data) ? data : []),
-      apiFetch<Client[]>("/api/clientes").then(({ data }) => Array.isArray(data) ? data : []),
+      apiFetch<{ data: Client[] }>("/api/clientes?limit=500").then(({ data }) => data?.data || []),
       apiFetch<Employee[]>("/api/empleadas").then(({ data }) => Array.isArray(data) ? data : []),
     ]).then(([appts, svcs, clts, emps]) => {
       setAppointments(appts);
@@ -124,7 +124,7 @@ export default function AgendaPage() {
       Promise.all([
         apiFetch<Appointment[]>("/api/citas").then(({ data }) => Array.isArray(data) ? data : []),
         apiFetch<Service[]>("/api/servicios").then(({ data }) => Array.isArray(data) ? data : []),
-        apiFetch<Client[]>("/api/clientes").then(({ data }) => Array.isArray(data) ? data : []),
+        apiFetch<{ data: Client[] }>("/api/clientes?limit=500").then(({ data }) => data?.data || []),
         apiFetch<Employee[]>("/api/empleadas").then(({ data }) => Array.isArray(data) ? data : []),
       ]).then(([appts, svcs, clts, emps]) => {
         setAppointments((prev) => {
@@ -235,6 +235,7 @@ export default function AgendaPage() {
           serviceName: updated.service.name,
           servicePrice: updated.service.price,
           appointmentDate: updated.date,
+          appointmentId: updated.id,
         }));
         // Solo ADMIN puede ir a ventas después
         if (isAdmin) {
@@ -520,8 +521,8 @@ export default function AgendaPage() {
           {showForm ? (
             <form onSubmit={handleSubmit} className="space-y-3.5">
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">Cliente</label>
-                <select required value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} className="select">
+                <label htmlFor="apt-client" className="block text-sm font-medium text-dark mb-1.5">Cliente</label>
+                <select id="apt-client" name="apt-client" required value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} className="select">
                   <option value="">Seleccionar cliente...</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
@@ -529,8 +530,8 @@ export default function AgendaPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">Servicio</label>
-                <select required value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })} className="select">
+                <label htmlFor="apt-service" className="block text-sm font-medium text-dark mb-1.5">Servicio</label>
+                <select id="apt-service" name="apt-service" required value={form.serviceId} onChange={(e) => setForm({ ...form, serviceId: e.target.value })} className="select">
                   <option value="">Seleccionar servicio...</option>
                   {services.filter((s) => s.active).map((s) => (
                     <option key={s.id} value={s.id}>{s.name} — ${s.price.toFixed(2)} ({s.duration}min)</option>
@@ -538,8 +539,8 @@ export default function AgendaPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">Empleada</label>
-                <select value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="select">
+                <label htmlFor="apt-employee" className="block text-sm font-medium text-dark mb-1.5">Empleada</label>
+                <select id="apt-employee" name="apt-employee" value={form.employeeId} onChange={(e) => setForm({ ...form, employeeId: e.target.value })} className="select">
                   <option value="">Sin asignar...</option>
                   {employees.filter((e) => e.active).map((e) => (
                     <option key={e.id} value={e.id}>{e.name}</option>
@@ -547,16 +548,16 @@ export default function AgendaPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">Fecha</label>
-                <input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input" />
+                <label htmlFor="apt-date" className="block text-sm font-medium text-dark mb-1.5">Fecha</label>
+                <input id="apt-date" name="apt-date" type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">Hora</label>
-                <input type="time" required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input" />
+                <label htmlFor="apt-time" className="block text-sm font-medium text-dark mb-1.5">Hora</label>
+                <input id="apt-time" name="apt-time" type="time" required value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="input" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">Notas</label>
-                <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className="input resize-none" placeholder="Notas adicionales..." />
+                <label htmlFor="apt-notes" className="block text-sm font-medium text-dark mb-1.5">Notas</label>
+                <textarea id="apt-notes" name="apt-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} className="input resize-none" placeholder="Notas adicionales..." />
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="btn-secondary flex-1">Cancelar</button>

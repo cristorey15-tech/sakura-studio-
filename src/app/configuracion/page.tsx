@@ -359,12 +359,12 @@ export default function ConfiguracionPage() {
         <CollapsibleSection title="Información del Estudio">
           {/* Nombre del estudio */}
           <div>
-            <label className="block text-sm font-medium text-dark mb-1.5">
+            <label htmlFor="studio-name" className="block text-sm font-medium text-dark mb-1.5">
               Nombre del Estudio
             </label>
             <input
-              type="text"
-              value={settings.name}
+              id="studio-name"
+              name="studio-name"
               onChange={(e) => handleChange("name", e.target.value)}
               className="input"
               placeholder="Ej: Sakura Studio"
@@ -377,10 +377,12 @@ export default function ConfiguracionPage() {
 
           {/* Subtítulo */}
           <div>
-            <label className="block text-sm font-medium text-dark mb-1.5">
+            <label htmlFor="studio-subtitle" className="block text-sm font-medium text-dark mb-1.5">
               Subtítulo
             </label>
             <input
+              id="studio-subtitle"
+              name="studio-subtitle"
               type="text"
               value={settings.subtitle}
               onChange={(e) => handleChange("subtitle", e.target.value)}
@@ -392,10 +394,12 @@ export default function ConfiguracionPage() {
 
           {/* Dirección */}
           <div>
-            <label className="block text-sm font-medium text-dark mb-1.5">
+            <label htmlFor="studio-address" className="block text-sm font-medium text-dark mb-1.5">
               Dirección
             </label>
             <input
+              id="studio-address"
+              name="studio-address"
               type="text"
               value={settings.address}
               onChange={(e) => handleChange("address", e.target.value)}
@@ -407,10 +411,12 @@ export default function ConfiguracionPage() {
 
           {/* Teléfono */}
           <div>
-            <label className="block text-sm font-medium text-dark mb-1.5">
+            <label htmlFor="studio-phone" className="block text-sm font-medium text-dark mb-1.5">
               Teléfono
             </label>
             <input
+              id="studio-phone"
+              name="studio-phone"
               type="text"
               value={settings.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
@@ -434,10 +440,12 @@ export default function ConfiguracionPage() {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">
+                <label htmlFor="studio-latitude" className="block text-sm font-medium text-dark mb-1.5">
                   Latitud
                 </label>
                 <input
+                  id="studio-latitude"
+                  name="studio-latitude"
                   type="number"
                   step="any"
                   value={settings.workLatitude ?? ""}
@@ -447,10 +455,12 @@ export default function ConfiguracionPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">
+                <label htmlFor="studio-longitude" className="block text-sm font-medium text-dark mb-1.5">
                   Longitud
                 </label>
                 <input
+                  id="studio-longitude"
+                  name="studio-longitude"
                   type="number"
                   step="any"
                   value={settings.workLongitude ?? ""}
@@ -460,10 +470,12 @@ export default function ConfiguracionPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">
+                <label htmlFor="studio-locationName" className="block text-sm font-medium text-dark mb-1.5">
                   Nombre de la ubicación
                 </label>
                 <input
+                  id="studio-locationName"
+                  name="studio-locationName"
                   type="text"
                   value={settings.workLocationName ?? ""}
                   onChange={(e) => handleChange("workLocationName", e.target.value)}
@@ -472,10 +484,12 @@ export default function ConfiguracionPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-dark mb-1.5">
+                <label htmlFor="studio-radius" className="block text-sm font-medium text-dark mb-1.5">
                   Radio de tolerancia (metros)
                 </label>
                 <input
+                  id="studio-radius"
+                  name="studio-radius"
                   type="number"
                   min={10}
                   step={10}
@@ -491,10 +505,12 @@ export default function ConfiguracionPage() {
 
           {/* Correo electrónico */}
           <div>
-            <label className="block text-sm font-medium text-dark mb-1.5">
+            <label htmlFor="studio-email" className="block text-sm font-medium text-dark mb-1.5">
               Correo Electrónico
             </label>
             <input
+              id="studio-email"
+              name="studio-email"
               type="text"
               value={settings.email}
               onChange={(e) => handleChange("email", e.target.value)}
