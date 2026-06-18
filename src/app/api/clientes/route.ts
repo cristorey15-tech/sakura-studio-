@@ -20,9 +20,12 @@ export async function GET(request: Request) {
       // Accent-insensitive + case-insensitive search using raw SQL
       const pattern = `%${normalizeForSearch(q)}%`;
       const nameSql = (col: string) => Prisma.raw(removeAccentsSql(col));
-      const [clients, countResult] = await Promise.all([
+      const [rawClients, countResult] = await Promise.all([
         prisma.$queryRaw<any[]>`
-          SELECT * FROM "Client"
+          SELECT "Client".*,
+            (SELECT COUNT(*) FROM "Appointment" WHERE "clientId" = "Client".id) as "_count_appointments",
+            (SELECT COUNT(*) FROM "Sale" WHERE "clientId" = "Client".id) as "_count_sales"
+          FROM "Client"
           WHERE ${nameSql("name")} LIKE ${pattern}
              OR ${nameSql("phone")} LIKE ${pattern}
              OR ${nameSql("email")} LIKE ${pattern}
@@ -36,6 +39,24 @@ export async function GET(request: Request) {
              OR ${nameSql("email")} LIKE ${pattern}
         `,
       ]);
+
+      // Transform raw results to include _count in the format the frontend expects
+      const clients = rawClients.map((c: Record<string, unknown>) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        birthDate: c.birthDate,
+        notes: c.notes,
+        visitCount: c.visitCount,
+        freeServiceAvailable: c.freeServiceAvailable,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        _count: {
+          appointments: Number(c._count_appointments ?? 0),
+          sales: Number(c._count_sales ?? 0),
+        },
+      }));
 
       return NextResponse.json({
         data: clients,
