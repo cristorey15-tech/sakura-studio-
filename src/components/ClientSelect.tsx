@@ -24,6 +24,9 @@ interface ClientSelectProps {
   refreshTrigger?: number;
 }
 
+const stripAccents = (str: string) =>
+  str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 export default function ClientSelect({
   value,
   onChange,
@@ -88,9 +91,7 @@ export default function ClientSelect({
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const filtered = clients.filter((c) =>
-      !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search)
-    );
+    const filtered = clients.filter(matchesSearch);
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -117,9 +118,13 @@ export default function ClientSelect({
     setHighlightIndex(-1);
   };
 
-  const filteredClients = clients.filter((c) =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search)
-  );
+  const matchesSearch = (c: DropdownClient) => {
+    if (!search) return true;
+    const s = stripAccents(search);
+    return stripAccents(c.name).includes(s) || (c.phone || '').toLowerCase().includes(s);
+  };
+
+  const filteredClients = clients.filter(matchesSearch);
 
   // Separate recent clients (visited in last 30 days)
   const recentClients = filteredClients.filter((c) => {

@@ -34,9 +34,7 @@ vi.mock("@/lib/prisma", () => ({
     employee: { count: vi.fn() },
     expense: { create: vi.fn(), count: vi.fn() },
     $transaction: vi.fn((fn: any) => fn({
-      sale: { create: vi.fn().mockResolvedValue({ id: 1, total: 50, totalBs: null, date: new Date(), paymentMethod: "EFECTIVO", notes: null, clientId: null, exchangeRate: null }),
-        create: vi.fn().mockResolvedValue({ id: 1, total: 50, totalBs: null, date: new Date(), paymentMethod: "EFECTIVO", notes: null, clientId: null, exchangeRate: null }),
-      },
+      sale: { create: vi.fn().mockResolvedValue({ id: 1, total: 50, totalBs: null, date: new Date(), paymentMethod: "EFECTIVO", notes: null, clientId: null, exchangeRate: null }) },
       appointment: { create: vi.fn(), update: vi.fn() },
       $executeRaw: vi.fn().mockResolvedValue(1),
     })),
@@ -740,14 +738,7 @@ describe("POST /api/ventas/quick — Validation", () => {
     });
     vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
       return fn({
-        sale: {
-          create: txSaleCreate,
-          create: vi.fn().mockResolvedValue({
-            id: 47,
-            total: 50,
-            client: { name: "Cliente de Paso" },
-          }),
-        },
+        sale: { create: txSaleCreate },
         appointment: { create: vi.fn(), update: vi.fn() },
         $executeRaw: vi.fn().mockResolvedValue(1),
       });
