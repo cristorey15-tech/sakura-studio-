@@ -125,7 +125,7 @@ export const POST = withCsrf(async (req: NextRequest) => {
           client: true,
           employee: true,
           items: { include: { service: true } },
-          paymentSplits: true,
+          // paymentSplits omitido intencionalmente — la tabla no existe en producción
         },
       });
 
