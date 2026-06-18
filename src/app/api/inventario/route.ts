@@ -6,6 +6,7 @@ import { createAuditLog } from "@/lib/auditLog";
 import { getUserFromCookie } from "@/lib/jwt";
 import { requireRole } from "@/lib/requireRole";
 import { likePattern, removeAccentsSql } from "@/lib/search";
+import { required, isString, isNumber, validate, validationErrorResponse } from "@/lib/validate";
 
 export async function GET(request: Request) {
   const auth = await requireRole(request, ["ADMIN"]);
@@ -105,6 +106,15 @@ export const POST = withCsrf(async (request: Request) => {
   if (auth.error) return auth.error;
   try {
     const data = await request.json();
+    const { valid, errors } = validate(
+      required(data, ["name", "category"]),
+      isString(data, "name", { maxLength: 200 }),
+      isString(data, "category", { maxLength: 50 }),
+      isNumber(data, "price", { min: 0, required: false }),
+      isNumber(data, "quantity", { min: 0, required: false }),
+      isNumber(data, "minStock", { min: 0, required: false }),
+    );
+    if (!valid) return validationErrorResponse(errors);
     const product = await prisma.product.create({ data });
     const user = await getUserFromCookie(request);
     createAuditLog({

@@ -4,6 +4,7 @@ import { withCsrf } from "@/lib/withCsrf";
 import { createAuditLog } from "@/lib/auditLog";
 import { getUserFromCookie } from "@/lib/jwt";
 import { requireRole } from "@/lib/requireRole";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 const WALKIN_NAME = "Cliente de Paso";
 
@@ -20,6 +21,15 @@ async function getOrCreateWalkinClient() {
 }
 
 export const POST = withCsrf(async (req: NextRequest) => {
+  // Rate limit: max 30 sales per minute per IP
+  const rateLimit = checkRateLimit(req, { windowMs: 60000, max: 30 });
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiadas solicitudes. Intenta de nuevo más tarde." },
+      { status: 429 }
+    );
+  }
+
   const auth = await requireRole(req, ["ADMIN"]);
   if (auth.error) return auth.error;
   try {

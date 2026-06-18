@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ToastProvider } from "@/hooks/useToast";
@@ -8,6 +8,7 @@ import QueryProvider from "@/lib/QueryProvider";
 import { ThemeProvider } from "@/lib/ThemeProvider";
 import PageTransition from "@/components/PageTransition";
 import GlobalSearch from "@/components/GlobalSearch";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 export const metadata: Metadata = {
   title: "Sakura Studio",
@@ -15,6 +16,19 @@ export const metadata: Metadata = {
   icons: {
     icon: "/logo.png",
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Sakura Studio",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#6366f1",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -30,17 +44,19 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>
           <AuthGuard>
-            <GlobalSearch />
-            <div className="min-h-full flex flex-col">
-              <TopNavbar />
-              <main className="flex-1" style={{ background: "var(--bg-body)" }}>
-                <div className="px-6 sm:px-10 lg:px-20 xl:px-28 py-3 lg:py-4 min-h-full flex flex-col">
-                  <PageTransition>
-                    {children}
-                  </PageTransition>
-                </div>
-              </main>
-            </div>
+            <ErrorBoundary>
+              <GlobalSearch />
+              <div className="min-h-full flex flex-col">
+                <TopNavbar />
+                <main className="flex-1" style={{ background: "var(--bg-body)" }}>
+                  <div className="px-6 sm:px-10 lg:px-20 xl:px-28 py-3 lg:py-4 min-h-full flex flex-col">
+                    <PageTransition>
+                      {children}
+                    </PageTransition>
+                  </div>
+                </main>
+              </div>
+            </ErrorBoundary>
           </AuthGuard>
         </ToastProvider>
         </AuthProvider>

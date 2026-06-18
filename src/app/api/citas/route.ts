@@ -4,6 +4,7 @@ import { withCsrf } from "@/lib/withCsrf";
 import { createAuditLog } from "@/lib/auditLog";
 import { getUserFromCookie } from "@/lib/jwt";
 import { requireRole } from "@/lib/requireRole";
+import { required, isString, isNumber, validate, validationErrorResponse } from "@/lib/validate";
 
 export async function GET() {
   try {
@@ -29,6 +30,13 @@ export const POST = withCsrf(async (request: Request) => {
   if (auth.error) return auth.error;
   try {
     const data = await request.json();
+    const { valid, errors } = validate(
+      required(data, ["date", "clientId", "serviceId"]),
+      isNumber(data, "clientId", { min: 1 }),
+      isNumber(data, "serviceId", { min: 1 }),
+      isNumber(data, "employeeId", { min: 1, required: false }),
+    );
+    if (!valid) return validationErrorResponse(errors);
     const appointmentDate = new Date(data.date);
     const serviceId = Number(data.serviceId);
     const employeeId = data.employeeId ? Number(data.employeeId) : null;

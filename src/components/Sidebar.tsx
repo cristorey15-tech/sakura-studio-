@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/lib/ThemeProvider";
+import NotificationBell from "@/components/NotificationBell";
 
 interface NavItem {
   name: string;
@@ -233,8 +234,10 @@ export default function TopNavbar() {
               })}
             </nav>
 
-            {/* ── Right side: Dark mode + User menu ── */}
+            {/* ── Right side: Notifications + Dark mode + User menu ── */}
             <div className="flex items-center gap-1.5 lg:gap-2 flex-shrink-0 ml-2 lg:ml-3">
+              {/* Notifications */}
+              <NotificationBell />
               {/* Search */}
               <button
                 onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}

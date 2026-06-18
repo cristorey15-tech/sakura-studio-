@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/useToast";
 import { apiFetch } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 interface Service {
   id: number;
@@ -397,6 +398,7 @@ export default function AgendaPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {viewMode === "mes" ? (
           /* Vista Mes */
+          <ErrorBoundary fallback={<div className="lg:col-span-2 card p-5 text-center text-muted text-sm">Error cargando calendario. <button onClick={() => window.location.reload()} className="text-primary underline">Recargar</button></div>}>
           <div className="lg:col-span-2 card p-5 animate-fadeIn">
             {/* Month navigation */}
             <div className="flex items-center justify-between mb-4">
@@ -494,8 +496,10 @@ export default function AgendaPage() {
               />
             </div>
           </div>
+          </ErrorBoundary>
         ) : (
           /* Vista Día — Timeline */
+          <ErrorBoundary fallback={<div className="lg:col-span-2 card p-5 text-center text-muted text-sm">Error cargando timeline. <button onClick={() => window.location.reload()} className="text-primary underline">Recargar</button></div>}>
           <DayTimeline
             isAdmin={isAdmin}
             date={selectedDate}
@@ -509,6 +513,7 @@ export default function AgendaPage() {
             onDelete={(id) => setDeleteTarget(id)}
             onChat={setChatTarget}
           />
+          </ErrorBoundary>
         )}
 
         {/* Sidebar: Form / Resumen */}

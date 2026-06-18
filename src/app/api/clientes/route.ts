@@ -6,6 +6,7 @@ import { createAuditLog } from "@/lib/auditLog";
 import { requireWriteAdmin } from "@/lib/requireRole";
 import { Prisma } from "@prisma/client";
 import { likePattern, removeAccentsSql } from "@/lib/search";
+import { required, isString, isEmail, validate, validationErrorResponse } from "@/lib/validate";
 
 export async function GET(request: Request) {
   try {
@@ -81,6 +82,13 @@ export const POST = withCsrf(async (request: Request) => {
   if (auth.error) return auth.error;
   try {
     const data = await request.json();
+    const { valid, errors } = validate(
+      required(data, ["name"]),
+      isString(data, "name", { maxLength: 200 }),
+      isString(data, "phone", { required: false, maxLength: 30 }),
+      isEmail(data, "email"),
+    );
+    if (!valid) return validationErrorResponse(errors);
     const client = await prisma.client.create({ data });
     const user = await getUserFromCookie(request);
     await createAuditLog({

@@ -6,6 +6,7 @@ import { createAuditLog } from "@/lib/auditLog";
 import { getUserFromCookie } from "@/lib/jwt";
 import { requireRole } from "@/lib/requireRole";
 import { likePattern, removeAccentsSql } from "@/lib/search";
+import { required, isNumber, validate, validationErrorResponse } from "@/lib/validate";
 
 export async function GET(request: Request) {
   const auth = await requireRole(request, ["ADMIN"]);
@@ -152,6 +153,15 @@ export const POST = withCsrf(async (request: Request) => {
   if (auth.error) return auth.error;
   try {
     const data = await request.json();
+    const { valid, errors } = validate(
+      required(data, ["total", "items"]),
+      isNumber(data, "total", { min: 0 }),
+      isNumber(data, "exchangeRate", { min: 0, required: false }),
+    );
+    if (!valid) return validationErrorResponse(errors);
+    if (!Array.isArray(data.items) || data.items.length === 0) {
+      return validationErrorResponse([{ field: "items", message: "Debe incluir al menos un servicio" }]);
+    }
     const clientId = data.clientId ? Number(data.clientId) : null;
     const user = await getUserFromCookie(request);
 

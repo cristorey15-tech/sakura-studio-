@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiFetch } from "@/lib/api";
+import { useSSE } from "@/hooks/useSSE";
 import { SkeletonPageHeader, SkeletonBlock, SkeletonStatsRow } from "@/components/LoadingSkeleton";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import {
   LineChart,
   Line,
@@ -172,7 +174,22 @@ export default function Dashboard() {
     checkAttendanceStatus();
   }, [checkAttendanceStatus]);
 
-  // Silent polling cada 15s
+  // SSE: real-time updates for sales count / low stock (replaces 15s polling)
+  useSSE({
+    channel: "general",
+    onSnapshot: useCallback((msg: { todaySalesTotal?: number; todayAppointments?: number }) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          todaySales: msg.todaySalesTotal ?? prev.todaySales,
+          todayAppointments: msg.todayAppointments ?? prev.todayAppointments,
+        };
+      });
+    }, []),
+  });
+
+  // Full refresh every 30s as fallback (SSE handles real-time)
   useEffect(() => {
     const interval = setInterval(() => {
       apiFetch<DashboardData>("/api/dashboard")
@@ -182,8 +199,7 @@ export default function Dashboard() {
           }
         })
         .catch(() => {});
-    }, 15000);
-
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -390,6 +406,50 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      {/* ═══════════ Tendencia Mes vs Mes Anterior (solo ADMIN) ═══════════ */}
+      {isAdmin && data.monthlyTrend.length >= 2 && (() => {
+        const current = data.monthlyTrend[data.monthlyTrend.length - 1];
+        const previous = data.monthlyTrend[data.monthlyTrend.length - 2];
+        const change = previous.total > 0
+          ? ((current.total - previous.total) / previous.total * 100)
+          : current.total > 0 ? 100 : 0;
+        const isUp = change > 0;
+        const isDown = change < 0;
+        return (
+          <div className="flex flex-wrap gap-3">
+            <div className="card-hover p-4 flex-1 min-w-[200px]">
+              <p className="text-xs text-muted font-medium">Ventas este mes</p>
+              <p className="text-xl font-bold text-dark mt-1">${current.total.toFixed(2)}</p>
+              <p className="text-xs text-muted mt-1">{current.count} {current.count === 1 ? "venta" : "ventas"}</p>
+            </div>
+            <div className="card-hover p-4 flex-1 min-w-[200px]">
+              <p className="text-xs text-muted font-medium">Mes anterior</p>
+              <p className="text-xl font-bold text-dark mt-1">${previous.total.toFixed(2)}</p>
+              <p className="text-xs text-muted mt-1">{previous.count} {previous.count === 1 ? "venta" : "ventas"}</p>
+            </div>
+            <div className={`card-hover p-4 flex-1 min-w-[200px] ${isUp ? "ring-1 ring-emerald-200" : isDown ? "ring-1 ring-red-200" : ""}`}>
+              <p className="text-xs text-muted font-medium">Cambio</p>
+              <p className={`text-xl font-bold mt-1 ${isUp ? "text-emerald-600" : isDown ? "text-red-500" : "text-dark"}`}>
+                {isUp ? "+" : ""}{change.toFixed(1)}%
+              </p>
+              <p className={`text-xs mt-1 ${isUp ? "text-emerald-600" : isDown ? "text-red-500" : "text-muted"}`}>
+                {isUp ? "📈 En crecimiento" : isDown ? "📉 En descenso" : "➡️ Sin cambio"}
+              </p>
+            </div>
+            {isDown && current.total < previous.total * 0.8 && (
+              <div className="w-full">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+                  <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+                  </svg>
+                  <span className="text-xs font-medium text-red-700">Las ventas bajaron más del 20% vs el mes anterior. Revisa las estrategias de marketing.</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ═══════════ Gráfica: Ingresos Mensuales (solo ADMIN) ═══════════ */}
       {isAdmin && (
@@ -889,6 +949,7 @@ export default function Dashboard() {
       )}
 
       {/* ═══════════ Próximas Citas ═══════════ */}
+      <ErrorBoundary fallback={<div className="card p-5 text-center text-muted text-sm">Error cargando citas. <button onClick={() => window.location.reload()} className="text-primary underline">Recargar</button></div>}>
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="section-header mb-0">
@@ -961,6 +1022,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      </ErrorBoundary>
     </div>
   );
 }

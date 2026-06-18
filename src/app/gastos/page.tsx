@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { SkeletonPageHeader } from "@/components/LoadingSkeleton";
 import EmptyState from "@/components/EmptyState";
 import Pagination from "@/components/Pagination";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface Expense {
   id: number;
@@ -318,18 +319,15 @@ export default function ExpensesPage() {
       </div>
 
       {/* Delete confirmation */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}>
-          <div className="card max-w-sm w-full p-5 animate-scaleIn shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-dark mb-2">Eliminar Gasto</h3>
-            <p className="text-sm text-muted mb-4">¿Estás seguro de que deseas eliminar este gasto? Esta acción no se puede deshacer.</p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setDeleteTarget(null)} className="btn-secondary">Cancelar</button>
-              <button onClick={() => handleDelete(deleteTarget)} className="px-4 py-2 bg-danger text-white rounded-lg text-sm font-medium hover:bg-danger/90 transition-colors">Eliminar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => { if (deleteTarget) handleDelete(deleteTarget); }}
+        title="Eliminar Gasto"
+        message="¿Estás seguro de que deseas eliminar este gasto? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
     </div>
   );
 }

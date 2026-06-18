@@ -9,6 +9,7 @@ interface SearchClient {
   id: number;
   name: string;
   phone: string | null;
+  email: string | null;
 }
 
 interface SearchService {
@@ -38,6 +39,25 @@ const categoryIcon: Record<string, string> = {
   MANICURE: "💅",
 };
 
+const RECENT_SEARCHES_KEY = "sakura_recent_searches";
+const MAX_RECENT = 5;
+
+function getRecentSearches(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentSearch(query: string) {
+  const recent = getRecentSearches().filter((r) => r !== query);
+  recent.unshift(query);
+  localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
+}
+
 export default function GlobalSearch() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -45,19 +65,18 @@ export default function GlobalSearch() {
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cmd+K / Ctrl+K toggle + custom event from sidebar button
+  // Cmd+K / Ctrl+K toggle + custom event
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setIsOpen((prev) => !prev);
       }
-      if (e.key === "Escape") {
-        setIsOpen(false);
-      }
+      if (e.key === "Escape") setIsOpen(false);
     };
     const handleOpen = () => setIsOpen(true);
     window.addEventListener("keydown", handleKeyDown);
@@ -75,10 +94,11 @@ export default function GlobalSearch() {
       setQuery("");
       setResults(null);
       setSelectedIndex(0);
+      setRecentSearches(getRecentSearches());
     }
   }, [isOpen]);
 
-  // Search
+  // Search with debounce
   const doSearch = useCallback(async (q: string) => {
     if (!q || q.length < 1) {
       setResults(null);
@@ -115,7 +135,7 @@ export default function GlobalSearch() {
       flatResults.push({
         type: "client",
         label: c.name,
-        subtitle: c.phone || "Sin teléfono",
+        subtitle: [c.phone, c.email].filter(Boolean).join(" · ") || "Sin datos de contacto",
         href: `/clientes/${c.id}`,
         icon: "👤",
       });
@@ -140,6 +160,12 @@ export default function GlobalSearch() {
     });
   }
 
+  const handleSelect = (href: string) => {
+    if (query.trim()) saveRecentSearch(query.trim());
+    router.push(href);
+    setIsOpen(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -149,23 +175,18 @@ export default function GlobalSearch() {
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Enter" && flatResults[selectedIndex]) {
       e.preventDefault();
-      router.push(flatResults[selectedIndex].href);
-      setIsOpen(false);
+      handleSelect(flatResults[selectedIndex].href);
     }
   };
 
   return (
     <>
-      {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
           onClick={() => setIsOpen(false)}
         >
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-
-          {/* Modal */}
           <div
             className="relative w-full max-w-lg mx-4 bg-white rounded-2xl shadow-2xl border border-border overflow-hidden animate-scaleIn"
             onClick={(e) => e.stopPropagation()}
@@ -181,7 +202,7 @@ export default function GlobalSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Buscar clientes, servicios, empleadas..."
+                placeholder="Buscar por nombre, teléfono, email..."
                 className="flex-1 text-sm text-dark placeholder:text-muted/50 bg-transparent border-none outline-none focus:outline-none"
                 autoComplete="off"
                 spellCheck={false}
@@ -192,14 +213,31 @@ export default function GlobalSearch() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-surface border border-border text-[10px] font-medium text-muted flex-shrink-0">
-                ESC
-              </kbd>
+              <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-surface border border-border text-[10px] font-medium text-muted flex-shrink-0">ESC</kbd>
             </div>
 
             {/* Results */}
             <div className="max-h-[50vh] overflow-y-auto p-2">
-              {!query && (
+              {/* Recent searches when no query */}
+              {!query && recentSearches.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted font-medium px-3 py-1.5">Búsquedas recientes</p>
+                  {recentSearches.map((term, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => { setQuery(term); }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted hover:bg-surface transition-colors text-left"
+                    >
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{term}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!query && recentSearches.length === 0 && (
                 <div className="text-center py-10">
                   <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-surface flex items-center justify-center">
                     <svg className="w-6 h-6 text-muted/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -218,20 +256,19 @@ export default function GlobalSearch() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <p className="text-sm text-muted font-medium">Sin resultados</p>
-                  <p className="text-xs text-muted/60 mt-1">Prueba con otro término de búsqueda</p>
+                  <p className="text-sm text-muted font-medium">Sin resultados para &ldquo;{query}&rdquo;</p>
+                  <p className="text-xs text-muted/60 mt-1">Prueba con otro término</p>
                 </div>
               )}
 
               {flatResults.length > 0 && (
                 <div className="space-y-0.5">
                   {flatResults.map((item, idx) => (
-                    <Link
+                    <button
                       key={`${item.type}-${item.label}-${idx}`}
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
+                      onClick={() => handleSelect(item.href)}
                       onMouseEnter={() => setSelectedIndex(idx)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 ${
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 text-left ${
                         idx === selectedIndex
                           ? "bg-primary-bg text-primary-dark"
                           : "text-dark hover:bg-surface"
@@ -247,13 +284,11 @@ export default function GlobalSearch() {
                         }`}>{item.subtitle}</p>
                       </div>
                       <span className={`text-[10px] uppercase tracking-wider font-medium flex-shrink-0 ${
-                        item.type === "client"
-                          ? "text-primary"
-                          : item.type === "service"
-                          ? "text-emerald-600"
+                        item.type === "client" ? "text-primary"
+                          : item.type === "service" ? "text-emerald-600"
                           : "text-violet-600"
                       }`}>{item.type}</span>
-                    </Link>
+                    </button>
                   ))}
                 </div>
               )}
