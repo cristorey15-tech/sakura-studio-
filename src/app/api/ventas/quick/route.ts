@@ -186,7 +186,11 @@ export const POST = withCsrf(async (req: NextRequest) => {
 
     return NextResponse.json(sale, { status: 201 });
   } catch (error) {
-    console.error("Quick sale error:", error);
-    return NextResponse.json({ error: "Error al procesar la venta rápida" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Error desconocido";
+    console.error("Quick sale error:", message, error instanceof Error ? error.stack : "");
+    return NextResponse.json({
+      error: "Error al procesar la venta rápida",
+      ...(process.env.NODE_ENV !== "production" ? { detail: message } : {}),
+    }, { status: 500 });
   }
 });
