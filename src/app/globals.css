@@ -163,44 +163,47 @@ body {
   background: var(--bg-surface);
 }
 
-/* Input base */
-.input {
-  width: 100%;
-  padding: 0.625rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border-color);
-  background: var(--bg-input);
-  outline: none;
-  transition: all 0.2s;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-}
-.input:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-}
-.input::placeholder {
-  color: var(--text-muted);
-  opacity: 0.6;
-}
+/* ─── Component layers (lower priority than Tailwind utilities) ─── */
+@layer components {
+  /* Input base */
+  .input {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    outline: none;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+  }
+  .input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
+  .input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
 
-/* Select base */
-.select {
-  width: 100%;
-  padding: 0.625rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border-color);
-  background: var(--bg-input);
-  outline: none;
-  transition: all 0.2s;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  appearance: none;
-  cursor: pointer;
-}
-.select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  /* Select base */
+  .select {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    outline: none;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    appearance: none;
+    cursor: pointer;
+  }
+  .select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  }
 }
 
 /* Badge base */

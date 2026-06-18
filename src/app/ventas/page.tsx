@@ -849,7 +849,7 @@ export default function VentasPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative flex-1 max-w-xs">
-                      <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-medium transition-opacity duration-150 ${form.exchangeRate ? 'opacity-0' : 'opacity-100'}`}>Bs</span>
+                      <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-medium pointer-events-none transition-opacity duration-150 ${form.exchangeRate ? 'opacity-0' : 'opacity-100'}`}>Bs</span>
                       <input
                         id="sale-exchangeRate"
                         name="sale-exchangeRate"
@@ -899,7 +899,7 @@ export default function VentasPage() {
                           ))}
                         </select>
                         <div className="relative w-28">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted">$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted pointer-events-none">$</span>
                           <input type="number" required min="0" step="0.01" value={item.price} onChange={(e) => updateItem(idx, "price", Number(e.target.value))} className="input pl-7" />
                         </div>
                         <button type="button" onClick={() => removeItem(idx)} className="p-2.5 text-muted hover:text-danger hover:bg-danger-bg rounded-lg transition-colors" aria-label="Eliminar servicio">✕</button>
@@ -929,7 +929,7 @@ export default function VentasPage() {
 
           {/* Search */}
           <div className="relative">
-            <svg className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted transition-opacity duration-150 ${search ? 'opacity-0' : 'opacity-100'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none transition-opacity duration-150 ${search ? 'opacity-0' : 'opacity-100'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -1282,7 +1282,7 @@ export default function VentasPage() {
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {isEditing ? (
-                              <div className="relative w-24">                                    <span className={`absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium transition-opacity duration-150 ${item.price > 0 ? 'opacity-0' : 'opacity-100'}`}>$</span>
+                              <div className="relative w-24">                                    <span className={`absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium pointer-events-none transition-opacity duration-150 ${item.price > 0 ? 'opacity-0' : 'opacity-100'}`}>$</span>
                                     <input
                                       type="number"
                                       min="0"
@@ -1367,7 +1367,7 @@ export default function VentasPage() {
                                   ))}
                                 </select>
                                 <div className="relative w-24">
-                                  <span className={`absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium transition-opacity duration-150 ${split.amount ? 'opacity-0' : 'opacity-100'}`}>$</span>
+                                  <span className={`absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium pointer-events-none transition-opacity duration-150 ${split.amount ? 'opacity-0' : 'opacity-100'}`}>$</span>
                                   <input
                                     type="number"
                                     min="0"
@@ -1494,7 +1494,7 @@ export default function VentasPage() {
                       Tasa de Cambio (Bs/USD)
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="relative flex-1 max-w-[160px]">                          <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-medium transition-opacity duration-150 ${posExchangeRate ? 'opacity-0' : 'opacity-100'}`}>Bs</span>
+                      <div className="relative flex-1 max-w-[160px]">                          <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-medium pointer-events-none transition-opacity duration-150 ${posExchangeRate ? 'opacity-0' : 'opacity-100'}`}>Bs</span>
                           <input
                             type="number"
                             min="0"
