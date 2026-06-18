@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
-import { likePattern, removeAccentsSql } from "@/lib/search";
+import { normalizeForSearch } from "@/lib/search";
+
+const SELECT_FIELDS = {
+  id: true,
+  name: true,
+  phone: true,
+  freeServiceAvailable: true,
+  visitCount: true,
+  _count: { select: { sales: true, appointments: true } },
+  sales: {
+    take: 1,
+    orderBy: { date: "desc" } as const,
+    select: { date: true },
+  },
+};
 
 /**
  * Lightweight endpoint for client dropdowns.
@@ -17,64 +30,24 @@ export async function GET(request: Request) {
     let clients: any[];
 
     if (q && q.length >= 1) {
-      // Accent-insensitive + case-insensitive search using raw SQL
-      const pattern = likePattern(q);
-      const nameCol = removeAccentsSql("name");
-      const phoneCol = removeAccentsSql("phone");
-      const whereClause = `(${nameCol} LIKE ${pattern} OR ${phoneCol} LIKE ${pattern})`;
-
-      const nameSql = (col: string) => Prisma.raw(removeAccentsSql(col));
-      const rawPattern = Prisma.raw(pattern);
-      const sql = Prisma.raw(whereClause);
-      // Get matching client IDs first, then fetch with full relations
-      const matchingRows = await prisma.$queryRaw<{ id: number }[]>`
-        SELECT id FROM "Client"
-        WHERE ${sql}
-        ORDER BY name ASC
-        LIMIT ${limit}
-      `;
-      const ids = matchingRows.map((r) => r.id);
-
-      if (ids.length === 0) {
-        return NextResponse.json([]);
-      }
-
-      // Fetch matching clients with visit info
-      clients = await prisma.client.findMany({
-        where: { id: { in: ids } },
+      // Fetch a broad set, then filter in JS for accent + case insensitivity
+      const searchLower = normalizeForSearch(q);
+      const allClients = await prisma.client.findMany({
+        take: 500,
         orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          freeServiceAvailable: true,
-          visitCount: true,
-          _count: { select: { sales: true, appointments: true } },
-          sales: {
-            take: 1,
-            orderBy: { date: "desc" },
-            select: { date: true },
-          },
-        },
+        select: SELECT_FIELDS,
       });
+      clients = allClients.filter((c) => {
+        const name = normalizeForSearch(c.name || "");
+        const phone = normalizeForSearch(c.phone || "");
+        return name.includes(searchLower) || phone.includes(searchLower);
+      }).slice(0, limit);
     } else {
       // No search — get clients with visit info for sorting
       clients = await prisma.client.findMany({
         take: limit,
         orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          freeServiceAvailable: true,
-          visitCount: true,
-          _count: { select: { sales: true, appointments: true } },
-          sales: {
-            take: 1,
-            orderBy: { date: "desc" },
-            select: { date: true },
-          },
-        },
+        select: SELECT_FIELDS,
       });
     }
 

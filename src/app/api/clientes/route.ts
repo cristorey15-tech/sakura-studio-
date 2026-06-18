@@ -5,7 +5,7 @@ import { getUserFromCookie } from "@/lib/jwt";
 import { createAuditLog } from "@/lib/auditLog";
 import { requireWriteAdmin } from "@/lib/requireRole";
 import { Prisma } from "@prisma/client";
-import { likePattern, removeAccentsSql } from "@/lib/search";
+import { normalizeForSearch, removeAccentsSql } from "@/lib/search";
 import { required, isString, isEmail, validate, validationErrorResponse } from "@/lib/validate";
 
 export async function GET(request: Request) {
@@ -18,25 +18,22 @@ export async function GET(request: Request) {
 
     if (q) {
       // Accent-insensitive + case-insensitive search using raw SQL
-      const pattern = likePattern(q);
-      const nameCol = removeAccentsSql("name");
-      const phoneCol = removeAccentsSql("phone");
-      const emailCol = removeAccentsSql("email");
-      const whereClause = `(${nameCol} LIKE ${pattern} OR ${phoneCol} LIKE ${pattern} OR ${emailCol} LIKE ${pattern})`;
-
+      const pattern = `%${normalizeForSearch(q)}%`;
       const nameSql = (col: string) => Prisma.raw(removeAccentsSql(col));
-      const rawPattern = Prisma.raw(pattern);
-      const sql = Prisma.raw(whereClause);
       const [clients, countResult] = await Promise.all([
         prisma.$queryRaw<any[]>`
           SELECT * FROM "Client"
-          WHERE ${sql}
+          WHERE ${nameSql("name")} LIKE ${pattern}
+             OR ${nameSql("phone")} LIKE ${pattern}
+             OR ${nameSql("email")} LIKE ${pattern}
           ORDER BY name ASC
           LIMIT ${limit} OFFSET ${skip}
         `,
         prisma.$queryRaw<[{ count: number }]>`
           SELECT COUNT(*) as count FROM "Client"
-          WHERE ${sql}
+          WHERE ${nameSql("name")} LIKE ${pattern}
+             OR ${nameSql("phone")} LIKE ${pattern}
+             OR ${nameSql("email")} LIKE ${pattern}
         `,
       ]);
 

@@ -5,7 +5,7 @@ import { withCsrf } from "@/lib/withCsrf";
 import { createAuditLog } from "@/lib/auditLog";
 import { getUserFromCookie } from "@/lib/jwt";
 import { requireRole } from "@/lib/requireRole";
-import { likePattern, removeAccentsSql } from "@/lib/search";
+import { normalizeForSearch, removeAccentsSql } from "@/lib/search";
 import { required, isString, isNumber, validate, validationErrorResponse } from "@/lib/validate";
 
 export async function GET(request: Request) {
@@ -27,12 +27,12 @@ export async function GET(request: Request) {
 
     if (q) {
       // Accent-insensitive search: find matching product IDs first
-      const pattern = likePattern(q);
+      const pattern = `%${normalizeForSearch(q)}%`;
       const nameSql = (col: string) => Prisma.raw(removeAccentsSql(col));
       const matchingRows = await prisma.$queryRaw<{ id: number }[]>`
         SELECT id FROM "Product"
-        WHERE ${nameSql("name")} LIKE ${Prisma.raw(pattern)}
-           OR ${nameSql("description")} LIKE ${Prisma.raw(pattern)}
+        WHERE ${nameSql("name")} LIKE ${pattern}
+           OR ${nameSql("description")} LIKE ${pattern}
       `;
       const matchingIds = matchingRows.map((r) => r.id);
 

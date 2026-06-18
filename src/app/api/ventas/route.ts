@@ -5,7 +5,7 @@ import { withCsrf } from "@/lib/withCsrf";
 import { createAuditLog } from "@/lib/auditLog";
 import { getUserFromCookie } from "@/lib/jwt";
 import { requireRole } from "@/lib/requireRole";
-import { likePattern, removeAccentsSql } from "@/lib/search";
+import { normalizeForSearch, removeAccentsSql } from "@/lib/search";
 import { required, isNumber, validate, validationErrorResponse } from "@/lib/validate";
 
 export async function GET(request: Request) {
@@ -21,18 +21,18 @@ export async function GET(request: Request) {
 
     if (q) {
       // Accent-insensitive search: find matching client IDs and service IDs first
-      const pattern = likePattern(q);
+      const pattern = `%${normalizeForSearch(q)}%`;
 
       const nameSql = (col: string) => Prisma.raw(removeAccentsSql(col));
       const [matchingClients, matchingServices] = await Promise.all([
         prisma.$queryRaw<{ id: number }[]>`
           SELECT id FROM "Client"
-          WHERE ${nameSql("name")} LIKE ${Prisma.raw(pattern)}
-             OR ${nameSql("phone")} LIKE ${Prisma.raw(pattern)}
+          WHERE ${nameSql("name")} LIKE ${pattern}
+             OR ${nameSql("phone")} LIKE ${pattern}
         `,
         prisma.$queryRaw<{ id: number }[]>`
           SELECT id FROM "Service"
-          WHERE ${nameSql("name")} LIKE ${Prisma.raw(pattern)}
+          WHERE ${nameSql("name")} LIKE ${pattern}
         `,
       ]);
 
