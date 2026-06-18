@@ -849,7 +849,7 @@ export default function VentasPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="relative flex-1 max-w-xs">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-medium">Bs</span>
+                      <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted font-medium transition-opacity duration-150 ${form.exchangeRate ? 'opacity-0' : 'opacity-100'}`}>Bs</span>
                       <input
                         id="sale-exchangeRate"
                         name="sale-exchangeRate"
@@ -929,7 +929,7 @@ export default function VentasPage() {
 
           {/* Search */}
           <div className="relative">
-            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted transition-opacity duration-150 ${search ? 'opacity-0' : 'opacity-100'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -1282,18 +1282,17 @@ export default function VentasPage() {
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {isEditing ? (
-                              <div className="relative w-24">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium">$</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.price}
-                                  onChange={(e) => updateCartItemPrice(item.id, Number(e.target.value))}
-                                  onBlur={() => setEditingPrice(null)}
-                                  onKeyDown={(e) => e.key === "Enter" && setEditingPrice(null)}
-                                  className="w-full pl-5 pr-2 py-1 text-sm font-bold text-primary bg-white border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                  autoFocus
+                              <div className="relative w-24">                                    <span className={`absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium transition-opacity duration-150 ${item.price > 0 ? 'opacity-0' : 'opacity-100'}`}>$</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.price}
+                                      onChange={(e) => updateCartItemPrice(item.id, Number(e.target.value))}
+                                      onBlur={() => setEditingPrice(null)}
+                                      onKeyDown={(e) => e.key === "Enter" && setEditingPrice(null)}
+                                      className="w-full pl-5 pr-2 py-1 text-sm font-bold text-primary bg-white border border-primary/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                      autoFocus
                                 />
                               </div>
                             ) : (
@@ -1368,7 +1367,7 @@ export default function VentasPage() {
                                   ))}
                                 </select>
                                 <div className="relative w-24">
-                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium">$</span>
+                                  <span className={`absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted font-medium transition-opacity duration-150 ${split.amount ? 'opacity-0' : 'opacity-100'}`}>$</span>
                                   <input
                                     type="number"
                                     min="0"
@@ -1495,17 +1494,16 @@ export default function VentasPage() {
                       Tasa de Cambio (Bs/USD)
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="relative flex-1 max-w-[160px]">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-medium">Bs</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={posExchangeRate}
-                          onChange={(e) => setPosExchangeRate(e.target.value)}
-                          className="w-full pl-8 pr-2.5 py-1.5 text-sm font-medium text-amber-900 bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300/50"
-                          placeholder="0.00"
-                          autoFocus
+                      <div className="relative flex-1 max-w-[160px]">                          <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-muted font-medium transition-opacity duration-150 ${posExchangeRate ? 'opacity-0' : 'opacity-100'}`}>Bs</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={posExchangeRate}
+                            onChange={(e) => setPosExchangeRate(e.target.value)}
+                            className="w-full pl-8 pr-2.5 py-1.5 text-sm font-medium text-amber-900 bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300/50"
+                            placeholder="0.00"
+                            autoFocus
                         />
                       </div>
                       {posExchangeRateNum > 0 && posTotal > 0 && (
