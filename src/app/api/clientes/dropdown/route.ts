@@ -8,7 +8,6 @@ const SELECT_FIELDS = {
   phone: true,
   freeServiceAvailable: true,
   visitCount: true,
-  _count: { select: { sales: true, appointments: true } },
   sales: {
     take: 1,
     orderBy: { date: "desc" } as const,
@@ -58,8 +57,6 @@ export async function GET(request: Request) {
       phone: c.phone,
       freeServiceAvailable: c.freeServiceAvailable,
       visitCount: c.visitCount,
-      saleCount: c._count?.sales ?? 0,
-      appointmentCount: c._count?.appointments ?? 0,
       lastVisit: c.sales?.[0]?.date ?? null,
     }));
 
