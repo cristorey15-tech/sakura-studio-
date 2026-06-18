@@ -51,7 +51,7 @@ export default function ClientSelect({
   const isInitialLoad = useRef(true);
   const fetchClients = useCallback(async (q: string) => {
     if (isInitialLoad.current) setLoading(true);
-    const url = q ? `/api/clientes/dropdown?q=${encodeURIComponent(q)}` : "/api/clientes/dropdown?limit=100";
+    const url = q ? `/api/clientes/dropdown?q=${encodeURIComponent(q)}` : "/api/clientes/dropdown?limit=500";
     const { data } = await apiFetch<DropdownClient[]>(url);
     if (data) setClients(data);
     if (isInitialLoad.current) {
