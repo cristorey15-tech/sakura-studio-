@@ -17,6 +17,16 @@ function getMonthLabel(m: number): string {
 export async function GET(request: Request) {
   try {
     const user = await getUserFromCookie(request);
+    const { searchParams } = new URL(request.url);
+    const employeeId = searchParams.get("employeeId");
+
+    function buildEmpFilter(): { employeeId?: number | null } | undefined {
+      if (!employeeId) return undefined;
+      if (employeeId === "_unassigned") return { employeeId: null };
+      return { employeeId: Number(employeeId) };
+    }
+    const empFilter = buildEmpFilter();
+
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -26,6 +36,16 @@ export async function GET(request: Request) {
     const dayOfWeek = now.getDay(); // 0=domingo, 6=sábado
     const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
     const saturday = new Date(sunday.getTime() + 7 * 86400000);
+
+    // Comparativas
+    const lastWeekStart = new Date(sunday.getTime() - 7 * 86400000);
+    const lastWeekEnd = sunday;
+    const yesterdayStart = new Date(startOfToday.getTime() - 86400000);
+    const yesterdayEnd = startOfToday;
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    const startOfMonthMinus1 = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     // Últimos 12 meses para tendencia
     const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 12, 1);
@@ -49,6 +69,11 @@ export async function GET(request: Request) {
       topClientsRaw,
       // Servicios individuales completados esta semana
       weeklyServices,
+      // Nuevas comparativas
+      lastWeekSalesAgg,
+      yesterdayAppointments,
+      newClientsThisMonth,
+      lastMonthSalesAgg,
       // Servicios completados esta semana por cada empleada
       servicesByEmployee,
     ] = await Promise.all([
@@ -63,11 +88,11 @@ export async function GET(request: Request) {
       }),
       prisma.sale.aggregate({
         _sum: { total: true },
-        where: { date: { gte: startOfMonth } },
+        where: { date: { gte: startOfMonth }, ...empFilter },
       }),
       prisma.sale.aggregate({
         _sum: { total: true },
-        where: { date: { gte: startOfToday, lt: endOfToday } },
+        where: { date: { gte: startOfToday, lt: endOfToday }, ...empFilter },
       }),
       prisma.appointment.findMany({
         take: 5,
@@ -100,7 +125,7 @@ export async function GET(request: Request) {
       ),
       // Ventas de los últimos 12 meses
       prisma.sale.findMany({
-        where: { date: { gte: twelveMonthsAgo } },
+        where: { date: { gte: twelveMonthsAgo }, ...empFilter },
         select: { date: true, total: true },
         orderBy: { date: "asc" },
       }),
@@ -132,6 +157,7 @@ export async function GET(request: Request) {
         _count: true,
         orderBy: { _sum: { total: "desc" } },
         take: 5,
+        where: empFilter as any,
       }).then(async (groups) => {
         const valid = groups.filter((g) => g.clientId !== null);
         if (valid.length === 0) return [];
@@ -174,6 +200,28 @@ export async function GET(request: Request) {
             count: g._count,
           }))
           .sort((a, b) => b.count - a.count);
+      }),
+      // Ventas de la semana pasada (para comparativa)
+      prisma.sale.aggregate({
+        _sum: { total: true },
+        _count: true,
+        where: { date: { gte: lastWeekStart, lt: lastWeekEnd }, ...empFilter },
+      }),
+      // Citas de ayer
+      prisma.appointment.count({
+        where: {
+          date: { gte: yesterdayStart, lt: yesterdayEnd },
+          status: { not: "CANCELADA" },
+        },
+      }),
+      // Clientes nuevos este mes
+      prisma.client.count({
+        where: { createdAt: { gte: startOfMonth } },
+      }),
+      // Ventas del mes pasado
+      prisma.sale.aggregate({
+        _sum: { total: true },
+        where: { date: { gte: startOfMonthMinus1, lt: startOfMonth }, ...empFilter },
       }),
       // Servicios completados esta semana por cada empleada
       prisma.appointment.groupBy({
@@ -268,6 +316,11 @@ export async function GET(request: Request) {
       myName: user?.name || null,
       servicesByEmployee,
       weeklyServices,
+      lastWeekSales: lastWeekSalesAgg._sum.total || 0,
+      lastWeekSalesCount: lastWeekSalesAgg._count,
+      yesterdayAppointments,
+      newClientsThisMonth,
+      lastMonthSales: lastMonthSalesAgg._sum.total || 0,
     });
   } catch (error) {
     console.error("Dashboard API error:", error);

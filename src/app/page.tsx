@@ -45,6 +45,11 @@ interface DashboardData {
   myName: string | null;
   servicesByEmployee: Array<{ employeeId: number | null; employeeName: string; count: number }>;
   weeklyServices: Array<{ serviceId: number; serviceName: string; category: string; count: number }>;
+  lastWeekSales: number;
+  lastWeekSalesCount: number;
+  yesterdayAppointments: number;
+  newClientsThisMonth: number;
+  lastMonthSales: number;
 }
 
 const statusColors: Record<string, string> = {
@@ -68,6 +73,8 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showMonths, setShowMonths] = useState<6 | 12>(12);
+  const [dashboardEmployeeFilter, setDashboardEmployeeFilter] = useState("");
+  const [employees, setEmployees] = useState<{ id: number; name: string }[]>([]);
 
   // ─── Attendance state ───
   const [attendanceState, setAttendanceState] = useState<{
@@ -154,8 +161,10 @@ export default function Dashboard() {
     );
   }, [showToast]);
 
-  useEffect(() => {
-    apiFetch<DashboardData>("/api/dashboard")
+  const loadDashboard = useCallback((empId?: string) => {
+    let url = "/api/dashboard";
+    if (empId) url += `?employeeId=${encodeURIComponent(empId)}`;
+    apiFetch<DashboardData>(url)
       .then(({ data, error }) => {
         if (data && typeof data === "object" && "totalClients" in data) {
           setData(data);
@@ -170,9 +179,18 @@ export default function Dashboard() {
         setLoading(false);
         showToast("error", "Error de conexión al cargar el dashboard");
       });
+  }, [showToast]);
 
+  useEffect(() => {
+    loadDashboard(dashboardEmployeeFilter || undefined);
     checkAttendanceStatus();
-  }, [checkAttendanceStatus]);
+    // Load employees for filter dropdown
+    apiFetch<{ id: number; name: string; active: boolean }[]>("/api/empleadas")
+      .then(({ data }) => {
+        if (data) setEmployees(data.filter((e) => e.active));
+      })
+      .catch(() => {});
+  }, [dashboardEmployeeFilter, loadDashboard, checkAttendanceStatus]);
 
   // SSE: real-time updates for sales count / low stock (replaces 15s polling)
   useSSE({
@@ -192,7 +210,9 @@ export default function Dashboard() {
   // Full refresh every 30s as fallback (SSE handles real-time)
   useEffect(() => {
     const interval = setInterval(() => {
-      apiFetch<DashboardData>("/api/dashboard")
+      let url = "/api/dashboard";
+      if (dashboardEmployeeFilter) url += `?employeeId=${encodeURIComponent(dashboardEmployeeFilter)}`;
+      apiFetch<DashboardData>(url)
         .then(({ data }) => {
           if (data && typeof data === "object" && "totalClients" in data) {
             setData(data);
@@ -201,7 +221,7 @@ export default function Dashboard() {
         .catch(() => {});
     }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [dashboardEmployeeFilter]);
 
   if (loading) {
     return (
@@ -219,6 +239,21 @@ export default function Dashboard() {
 
   if (!data) return null;
 
+  // ─── Helper: format % change ───
+  const formatPct = (current: number, previous: number): { text: string; isUp: boolean; isDown: boolean } => {
+    if (previous === 0 && current === 0) return { text: "Sin datos", isUp: false, isDown: false };
+    if (previous === 0) return { text: "+100%", isUp: true, isDown: false };
+    const change = ((current - previous) / previous) * 100;
+    const absChange = Math.abs(change);
+    if (change > 0) return { text: `+${absChange.toFixed(1)}%`, isUp: true, isDown: false };
+    if (change < 0) return { text: `-${absChange.toFixed(1)}%`, isUp: false, isDown: true };
+    return { text: "0%", isUp: false, isDown: false };
+  };
+
+  const salesPct = formatPct(data.monthlySales, data.lastMonthSales);
+  const weekSalesPct = formatPct(data.monthlySales, data.lastWeekSales * 4.33);
+  const apptsPct = formatPct(data.todayAppointments, data.yesterdayAppointments);
+
   const allStats = [
     {
       label: "Clientes Registrados",
@@ -230,6 +265,18 @@ export default function Dashboard() {
       ),
       href: "/clientes",
       color: "from-blue-500 to-blue-600",
+      tooltip: (
+        <div className="space-y-1">
+          <p className="flex items-center justify-between gap-3">
+            <span className="text-muted">Nuevos este mes</span>
+            <span className="font-semibold text-dark">{data.newClientsThisMonth}</span>
+          </p>
+          <p className="flex items-center justify-between gap-3">
+            <span className="text-muted">Total citas</span>
+            <span className="font-semibold text-dark">{data.totalAppointments}</span>
+          </p>
+        </div>
+      ),
     },
     {
       label: "Servicios Activos",
@@ -241,6 +288,12 @@ export default function Dashboard() {
       ),
       href: "/servicios",
       color: "from-violet-500 to-violet-600",
+      tooltip: (
+        <p className="flex items-center justify-between gap-3">
+          <span className="text-muted">Total citas agendadas</span>
+          <span className="font-semibold text-dark">{data.totalAppointments}</span>
+        </p>
+      ),
     },
     {
       label: "Ventas del Mes",
@@ -252,6 +305,26 @@ export default function Dashboard() {
       ),
       href: "/ventas",
       color: "from-emerald-500 to-emerald-600",
+      tooltip: (
+        <div className="space-y-1.5">
+          <p className="flex items-center justify-between gap-3">
+            <span className="text-muted">Vs mes pasado</span>
+            <span className={`font-semibold ${salesPct.isUp ? "text-emerald-600" : salesPct.isDown ? "text-red-500" : "text-muted"}`}>
+              {salesPct.text}
+            </span>
+          </p>
+          <p className="flex items-center justify-between gap-3">
+            <span className="text-muted">Semana pasada</span>
+            <span className="font-semibold text-dark">${data.lastWeekSales.toFixed(2)}</span>
+          </p>
+          <p className="flex items-center justify-between gap-3">
+            <span className="text-muted">Proyección mensual</span>
+            <span className={`font-semibold ${weekSalesPct.isUp ? "text-emerald-600" : weekSalesPct.isDown ? "text-red-500" : "text-muted"}`}>
+              {weekSalesPct.text}
+            </span>
+          </p>
+        </div>
+      ),
     },
     {
       label: "Citas para Hoy",
@@ -263,6 +336,20 @@ export default function Dashboard() {
       ),
       href: "/agenda",
       color: "from-amber-500 to-amber-600",
+      tooltip: (
+        <div className="space-y-1">
+          <p className="flex items-center justify-between gap-3">
+            <span className="text-muted">Ayer</span>
+            <span className="font-semibold text-dark">{data.yesterdayAppointments}</span>
+          </p>
+          <p className="flex items-center justify-between gap-3">
+            <span className="text-muted">Cambio</span>
+            <span className={`font-semibold ${apptsPct.isUp ? "text-emerald-600" : apptsPct.isDown ? "text-red-500" : "text-muted"}`}>
+              {apptsPct.text}
+            </span>
+          </p>
+        </div>
+      ),
     },
   ];
 
@@ -278,6 +365,12 @@ export default function Dashboard() {
     ),
     href: "/agenda",
     color: "from-rose-400 to-rose-500",
+    tooltip: (
+      <p className="flex items-center justify-between gap-3">
+        <span className="text-muted">Servicios esta semana</span>
+        <span className="font-semibold text-dark">{data.myWeeklyServices}</span>
+      </p>
+    ),
   };
   const stats = isAdmin 
     ? allStats 
@@ -295,21 +388,41 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-dark">Dashboard</h1>
           <p className="text-sm text-muted mt-1">Resumen general de tu estudio</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-border shadow-sm text-sm text-muted self-start">
-          <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          {new Date().toLocaleDateString("es-MX", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
+        <div className="flex items-center gap-2 self-start">
+          {/* Employee filter */}
+          {isAdmin && (
+            <select
+              value={dashboardEmployeeFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDashboardEmployeeFilter(val);
+                setLoading(true);
+              }}
+              className="select text-xs py-1.5 pr-7 appearance-none bg-white"
+            >
+              <option value="">Todas las empleadas</option>
+              <option value="_unassigned">— Sin asignar —</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>{emp.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-border shadow-sm text-sm text-muted">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            {new Date().toLocaleDateString("es-MX", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
         </div>
       </div>
 
       {/* ═══════════ Stats Cards ═══════════ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {stats.map((stat, idx) => (
-          <Link key={stat.label} href={stat.href}>
+          <Link key={stat.label} href={stat.href} className="relative group/tooltip">
             <div className="card-hover p-4 sm:p-5 group cursor-pointer">
               <div className="flex items-center gap-3 sm:gap-5">
                 <div className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br ${stat.color} shadow-sm flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform`}>
@@ -322,6 +435,22 @@ export default function Dashboard() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] sm:text-xs text-muted font-medium truncate">{stat.label}</p>
                   <p className="text-2xl sm:text-3xl font-bold text-dark mt-0.5 sm:mt-1">{stat.value}</p>
+                </div>
+              </div>
+              {/* Tooltip info icon */}
+              <div className="absolute top-2 right-2 opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200">
+                <div className="relative">
+                  <svg className="w-4 h-4 text-muted/60 hover:text-primary cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                  </svg>
+                  {/* Tooltip content */}
+                  <div className="absolute bottom-full right-0 mb-2 w-56 p-3 bg-white rounded-xl border border-border shadow-lg z-50 opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 translate-y-1 group-hover/tooltip:translate-y-0 pointer-events-none">
+                    <div className="text-xs">
+                      {stat.tooltip}
+                    </div>
+                    {/* Arrow */}
+                    <div className="absolute top-full right-3 w-3 h-3 bg-white border-r border-b border-border rotate-45 -mt-1.5" />
+                  </div>
                 </div>
               </div>
             </div>
