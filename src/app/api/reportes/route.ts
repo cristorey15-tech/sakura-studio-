@@ -37,6 +37,7 @@ export async function GET(request: Request) {
     // Custom date range from query params
     const customStart = searchParams.get("startDate");
     const customEnd = searchParams.get("endDate");
+    const employeeId = searchParams.get("employeeId");
 
     // Fechas de referencia para periodos predefinidos
     const startOfWeek = new Date(now);
@@ -52,10 +53,20 @@ export async function GET(request: Request) {
 
     const allTimeStart = new Date(0);
 
+    function buildEmployeeFilter(): Prisma.SaleWhereInput | undefined {
+      if (!employeeId) return undefined;
+      if (employeeId === "_unassigned") return { employeeId: null };
+      return { employeeId: Number(employeeId) };
+    }
+
     function salesAggregate(gte: Date, lte?: Date): SaleAggregate {
       const where: Prisma.SaleWhereInput = { date: { gte } };
       if (lte) {
         where.date = { gte, lte };
+      }
+      const empFilter = buildEmployeeFilter();
+      if (empFilter) {
+        where.employeeId = empFilter.employeeId;
       }
       return prisma.sale.aggregate({
         _sum: { total: true },
@@ -88,6 +99,12 @@ export async function GET(request: Request) {
       };
     }
 
+    // Apply employee filter to employee sales query
+    const empFilter = buildEmployeeFilter();
+    if (empFilter && salesWhereEmployees.employeeId) {
+      salesWhereEmployees.employeeId = empFilter.employeeId;
+    }
+
     const p6: Prisma.PrismaPromise<SaleForEmployee[]> = prisma.sale.findMany({
       where: salesWhereEmployees,
       select: {
@@ -102,6 +119,10 @@ export async function GET(request: Request) {
     let allSalesWhere: Prisma.SaleWhereInput = {};
     if (customStart && customStartDate) {
       allSalesWhere = { date: { gte: customStartDate, lte: customEndDate! } };
+    }
+    const empFilterAll = buildEmployeeFilter();
+    if (empFilterAll) {
+      allSalesWhere.employeeId = empFilterAll.employeeId;
     }
 
     const p7: Prisma.PrismaPromise<{ total: number; date: Date }[]> = prisma.sale.findMany({

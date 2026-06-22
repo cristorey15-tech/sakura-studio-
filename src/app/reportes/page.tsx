@@ -921,6 +921,8 @@ export default function ReportesPage() {
   const [perfApplied, setPerfApplied] = useState(false);
   const [perfLoading, setPerfLoading] = useState(false);
   const [perfPage, setPerfPage] = useState(1);
+  const [reportsEmployeeFilter, setReportsEmployeeFilter] = useState("");
+  const [perfEmployeeFilter, setPerfEmployeeFilter] = useState("");
 
   // ─── Asistencia state ───
   interface AttendanceRecord {
@@ -1089,7 +1091,7 @@ export default function ReportesPage() {
       .catch(() => {});
   }, []);
 
-  const fetchData = useCallback((startDate?: string, endDate?: string, isFilterReload?: boolean, isPerfReload?: boolean) => {
+  const fetchData = useCallback((startDate?: string, endDate?: string, isFilterReload?: boolean, isPerfReload?: boolean, empId?: string) => {
     if (isPerfReload) {
       setPerfLoading(true);
     } else if (isFilterReload) {
@@ -1102,6 +1104,7 @@ export default function ReportesPage() {
       url += `?startDate=${encodeURIComponent(startDate)}`;
       if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
     }
+    if (empId) url += `${url.includes("?") ? "&" : "?"}employeeId=${encodeURIComponent(empId)}`;
     apiFetch<ReportData>(url)
       .then(({ data }) => {
         if (data) setData(data);
@@ -1144,13 +1147,14 @@ export default function ReportesPage() {
   const handleApplyFilter = () => {
     if (!customStart) return;
     setFilterApplied(true);
-    fetchData(customStart, customEnd || undefined, true);
+    fetchData(customStart, customEnd || undefined, true, undefined, reportsEmployeeFilter || undefined);
   };
 
   const handleClearFilter = () => {
     setCustomStart("");
     setCustomEnd("");
     setFilterApplied(false);
+    setReportsEmployeeFilter("");
     fetchData();
   };
 
@@ -1158,7 +1162,7 @@ export default function ReportesPage() {
     if (!perfStart) return;
     setPerfApplied(true);
     setPerfPage(1);
-    fetchData(perfStart, perfEnd || undefined, false, true);
+    fetchData(perfStart, perfEnd || undefined, false, true, perfEmployeeFilter || undefined);
   };
 
   const handleClearPerfFilter = () => {
@@ -1166,6 +1170,7 @@ export default function ReportesPage() {
     setPerfEnd("");
     setPerfApplied(false);
     setPerfPage(1);
+    setPerfEmployeeFilter("");
     fetchData();
   };
 
@@ -1173,7 +1178,7 @@ export default function ReportesPage() {
     setCustomStart(start);
     setCustomEnd(end);
     setFilterApplied(true);
-    fetchData(start, end, true);
+    fetchData(start, end, true, undefined, reportsEmployeeFilter || undefined);
   };
 
   const handlePerfPresetClick = (start: string, end: string) => {
@@ -1181,7 +1186,7 @@ export default function ReportesPage() {
     setPerfEnd(end);
     setPerfApplied(true);
     setPerfPage(1);
-    fetchData(start, end, false, true);
+    fetchData(start, end, false, true, perfEmployeeFilter || undefined);
   };
 
   /* ─── Pagos handlers ─── */
@@ -1428,6 +1433,20 @@ export default function ReportesPage() {
                   onChange={(e) => setCustomEnd(e.target.value)}
                   className="input"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted mb-1.5">Empleada (opcional)</label>
+                <select
+                  value={reportsEmployeeFilter}
+                  onChange={(e) => setReportsEmployeeFilter(e.target.value)}
+                  className="select text-sm"
+                >
+                  <option value="">Todas las empleadas</option>
+                  <option value="_unassigned">— Sin asignar —</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 <button
@@ -1707,6 +1726,20 @@ export default function ReportesPage() {
                   onChange={(e) => setPerfEnd(e.target.value)}
                   className="input"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted mb-1.5">Empleada (opcional)</label>
+                <select
+                  value={perfEmployeeFilter}
+                  onChange={(e) => setPerfEmployeeFilter(e.target.value)}
+                  className="select text-sm"
+                >
+                  <option value="">Todas las empleadas</option>
+                  <option value="_unassigned">— Sin asignar —</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 <button

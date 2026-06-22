@@ -18,6 +18,19 @@ export async function GET(request: Request) {
     const skip = (page - 1) * limit;
     const q = searchParams.get("q") || "";
     const currency = searchParams.get("currency") || "ALL";
+    const employeeFilter = searchParams.get("employeeId") || "";
+
+    // Build base where clause
+    function buildBaseWhere(extraFilter?: (w: any) => void) {
+      const where: any = {};
+      if (currency === "USD") where.totalBs = null;
+      else if (currency === "BS") where.totalBs = { not: null };
+      if (employeeFilter) {
+        where.employeeId = employeeFilter === "_unassigned" ? null : Number(employeeFilter);
+      }
+      if (extraFilter) extraFilter(where);
+      return where;
+    }
 
     if (q) {
       // Accent-insensitive search: find matching client IDs and service IDs first
@@ -39,20 +52,20 @@ export async function GET(request: Request) {
       const clientIds = matchingClients.map((c) => c.id);
       const serviceIds = matchingServices.map((s) => s.id);
 
-      // Build where with accent-insensitive IDs + currency filter
-      const where: any = {};
-      if (currency === "USD") where.totalBs = null;
-      else if (currency === "BS") where.totalBs = { not: null };
+      // Build where with accent-insensitive IDs + currency + employee filter
+      const where = buildBaseWhere((w: any) => {
+        if (clientIds.length > 0 || serviceIds.length > 0) {
+          w.OR = [];
+          if (clientIds.length > 0) {
+            w.OR.push({ clientId: { in: clientIds } });
+          }
+          if (serviceIds.length > 0) {
+            w.OR.push({ items: { some: { serviceId: { in: serviceIds } } } });
+          }
+        }
+      });
 
-      if (clientIds.length > 0 || serviceIds.length > 0) {
-        where.OR = [];
-        if (clientIds.length > 0) {
-          where.OR.push({ clientId: { in: clientIds } });
-        }
-        if (serviceIds.length > 0) {
-          where.OR.push({ items: { some: { serviceId: { in: serviceIds } } } });
-        }
-      } else {
+      if (!where.OR && !where.clientId && !where.employeeId && !where.totalBs) {
         // No matches found — return empty
         return NextResponse.json({
           data: [],
@@ -101,9 +114,7 @@ export async function GET(request: Request) {
     }
 
     // No search term — regular query
-    const where: any = {};
-    if (currency === "USD") where.totalBs = null;
-    else if (currency === "BS") where.totalBs = { not: null };
+    const where = buildBaseWhere();
 
     const [sales, total] = await Promise.all([
       prisma.sale.findMany({
@@ -165,9 +176,17 @@ export const POST = withCsrf(async (request: Request) => {
     const clientId = data.clientId ? Number(data.clientId) : null;
     const user = await getUserFromCookie(request);
 
+    const serviceDate = data.serviceDate
+      ? (() => {
+          const [y, m, d] = data.serviceDate.split("-").map(Number);
+          return new Date(y, m - 1, d, 12, 0, 0);
+        })()
+      : new Date();
+
     const sale = await prisma.$transaction(async (tx) => {
       const s = await tx.sale.create({
         data: {
+          date: serviceDate,
           total: data.total,
           totalBs: data.totalBs || null,
           exchangeRate: data.exchangeRate || null,

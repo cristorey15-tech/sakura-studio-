@@ -132,6 +132,7 @@ export default function VentasPage() {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [currencyFilter, setCurrencyFilter] = useState<"ALL" | "USD" | "BS">("ALL");
+  const [employeeFilter, setEmployeeFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalSales, setTotalSales] = useState(0);
@@ -161,6 +162,28 @@ export default function VentasPage() {
   });
   const [chatTarget, setChatTarget] = useState<{ id: number; name: string; phone: string } | null>(null);
   const [showManager, setShowManager] = useState(false);
+
+  // ─── Date editing state ───
+  const [editingDateId, setEditingDateId] = useState<number | null>(null);
+  const [editingDateValue, setEditingDateValue] = useState("");
+
+  // ─── Payment method editing state ───
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [editingPaymentValue, setEditingPaymentValue] = useState("");
+
+  // ─── Notes editing state ───
+  const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
+  const [editingNotesValue, setEditingNotesValue] = useState("");
+
+  // ─── Total / Bs editing state ───
+  const [editingTotalId, setEditingTotalId] = useState<number | null>(null);
+  const [editingTotalValue, setEditingTotalValue] = useState("");
+  const [editingTotalBsId, setEditingTotalBsId] = useState<number | null>(null);
+  const [editingTotalBsValue, setEditingTotalBsValue] = useState("");
+
+  // ─── Employee editing state ───
+  const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null);
+  const [editingEmployeeValue, setEditingEmployeeValue] = useState("");
 
   // ─── POS State ───
   const [posStep, setPosStep] = useState<Step>("services");
@@ -192,6 +215,7 @@ export default function VentasPage() {
       const params = new URLSearchParams({ page: String(currentPage), limit: "15" });
       if (search) params.set("q", search);
       if (currencyFilter !== "ALL") params.set("currency", currencyFilter);
+      if (employeeFilter) params.set("employeeId", employeeFilter);
       apiFetch<{ data: Sale[]; total: number; page: number; totalPages: number; stats: typeof salesStats }>(`/api/ventas?${params}`)
         .then(({ data }) => {
           if (data) {
@@ -206,7 +230,7 @@ export default function VentasPage() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [currentPage, search, currencyFilter]);
+  }, [currentPage, search, currencyFilter, employeeFilter]);
 
   // SSE: real-time sales updates via useSSE hook
   useSSE({
@@ -278,10 +302,11 @@ export default function VentasPage() {
   };
 
   // ─── Data Loaders ───
-  const loadSales = (p: number, q?: string, currency?: string) => {
+  const loadSales = (p: number, q?: string, currency?: string, empId?: string) => {
     const params = new URLSearchParams({ page: String(p), limit: "15" });
     if (q) params.set("q", q);
     if (currency && currency !== "ALL") params.set("currency", currency);
+    if (empId) params.set("employeeId", empId);
     apiFetch<{ data: Sale[]; total: number; page: number; totalPages: number; stats: typeof salesStats }>(`/api/ventas?${params}`)
       .then(({ data }) => {
         if (data) {
@@ -412,7 +437,7 @@ export default function VentasPage() {
       setPendingAppointmentId(null);
       resetForm();
       setListLoading(true);
-      loadSales(1, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined);
+      loadSales(1, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
     } else {
       showToast("error", apiError || "Error al registrar la venta");
     }
@@ -430,7 +455,7 @@ export default function VentasPage() {
       showToast("success", "Venta eliminada");
       const newPage = sales.length <= 1 && currentPage > 1 ? currentPage - 1 : currentPage;
       setListLoading(true);
-      loadSales(newPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined);
+      loadSales(newPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
     } else {
       showToast("error", "Error al eliminar la venta");
     }
@@ -551,11 +576,176 @@ export default function VentasPage() {
       setPosServiceDate(todayStr);
       setPosSplitMode(false);
       setPosSplits([{ method: "EFECTIVO", amount: "", amountBs: "" }]);
-      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined);
+      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
     } else {
       showToast("error", apiError || "Error al procesar la venta");
     }
     setPosSubmitting(false);
+  };
+
+  // ─── Edit sale date handlers ───
+  const startEditDate = (saleId: number, currentDate: string) => {
+    const d = new Date(currentDate);
+    const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setEditingDateId(saleId);
+    setEditingDateValue(localDate);
+  };
+
+  const saveEditDate = async (saleId: number) => {
+    if (!editingDateValue) return;
+    const { data, error: apiError } = await apiFetch(`/api/ventas/${saleId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ date: editingDateValue }),
+    });
+    if (data) {
+      showToast("success", "Fecha actualizada ✅");
+      setEditingDateId(null);
+      // Refresh the list
+      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
+    } else {
+      showToast("error", apiError || "Error al actualizar la fecha");
+    }
+  };
+
+  const cancelEditDate = () => {
+    setEditingDateId(null);
+    setEditingDateValue("");
+  };
+
+  // ─── Edit payment method handlers ───
+  const startEditPayment = (saleId: number, currentMethod: string | null) => {
+    setEditingPaymentId(saleId);
+    setEditingPaymentValue(currentMethod || "EFECTIVO");
+  };
+
+  const saveEditPayment = async (saleId: number) => {
+    if (!editingPaymentValue) return;
+    const { data, error: apiError } = await apiFetch(`/api/ventas/${saleId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ paymentMethod: editingPaymentValue }),
+    });
+    if (data) {
+      showToast("success", "Método de pago actualizado ✅");
+      setEditingPaymentId(null);
+      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
+    } else {
+      showToast("error", apiError || "Error al actualizar método de pago");
+    }
+  };
+
+  const cancelEditPayment = () => {
+    setEditingPaymentId(null);
+    setEditingPaymentValue("");
+  };
+
+  // ─── Edit notes handlers ───
+  const startEditNotes = (saleId: number, currentNotes: string | null) => {
+    setEditingNotesId(saleId);
+    setEditingNotesValue(currentNotes || "");
+  };
+
+  const saveEditNotes = async (saleId: number) => {
+    const { data, error: apiError } = await apiFetch(`/api/ventas/${saleId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ notes: editingNotesValue || null }),
+    });
+    if (data) {
+      showToast("success", "Nota actualizada ✅");
+      setEditingNotesId(null);
+      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
+    } else {
+      showToast("error", apiError || "Error al actualizar la nota");
+    }
+  };
+
+  const cancelEditNotes = () => {
+    setEditingNotesId(null);
+    setEditingNotesValue("");
+  };
+
+  // ─── Edit total (USD) handlers ───
+  const startEditTotal = (saleId: number, currentTotal: number) => {
+    setEditingTotalId(saleId);
+    setEditingTotalValue(String(currentTotal));
+  };
+
+  const saveEditTotal = async (saleId: number) => {
+    const val = Number(editingTotalValue);
+    if (isNaN(val) || val < 0) {
+      showToast("error", "Monto inválido");
+      return;
+    }
+    const { data, error: apiError } = await apiFetch(`/api/ventas/${saleId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ total: val }),
+    });
+    if (data) {
+      showToast("success", "Total USD actualizado ✅");
+      setEditingTotalId(null);
+      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
+    } else {
+      showToast("error", apiError || "Error al actualizar el total");
+    }
+  };
+
+  const cancelEditTotal = () => {
+    setEditingTotalId(null);
+    setEditingTotalValue("");
+  };
+
+  // ─── Edit total Bs handlers ───
+  const startEditTotalBs = (saleId: number, currentBs: number | null) => {
+    setEditingTotalBsId(saleId);
+    setEditingTotalBsValue(currentBs !== null ? String(currentBs) : "");
+  };
+
+  const saveEditTotalBs = async (saleId: number) => {
+    const val = editingTotalBsValue ? Number(editingTotalBsValue) : null;
+    if (val !== null && (isNaN(val) || val < 0)) {
+      showToast("error", "Monto Bs inválido");
+      return;
+    }
+    const { data, error: apiError } = await apiFetch(`/api/ventas/${saleId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ totalBs: val }),
+    });
+    if (data) {
+      showToast("success", "Monto Bs actualizado ✅");
+      setEditingTotalBsId(null);
+      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
+    } else {
+      showToast("error", apiError || "Error al actualizar el monto Bs");
+    }
+  };
+
+  const cancelEditTotalBs = () => {
+    setEditingTotalBsId(null);
+    setEditingTotalBsValue("");
+  };
+
+  // ─── Edit employee handlers ───
+  const startEditEmployee = (saleId: number, currentEmpId: number | null) => {
+    setEditingEmployeeId(saleId);
+    setEditingEmployeeValue(currentEmpId ? String(currentEmpId) : "");
+  };
+
+  const saveEditEmployee = async (saleId: number) => {
+    const { data, error: apiError } = await apiFetch(`/api/ventas/${saleId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ employeeId: editingEmployeeValue || null }),
+    });
+    if (data) {
+      showToast("success", "Empleada actualizada ✅");
+      setEditingEmployeeId(null);
+      loadSales(currentPage, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
+    } else {
+      showToast("error", apiError || "Error al actualizar la empleada");
+    }
+  };
+
+  const cancelEditEmployee = () => {
+    setEditingEmployeeId(null);
+    setEditingEmployeeValue("");
   };
 
   // ─── Keyboard shortcuts for POS ───
@@ -733,13 +923,13 @@ export default function VentasPage() {
             {/* Currency filter */}
             <div className="flex items-center gap-1.5 bg-surface p-1 rounded-xl border border-border w-fit self-start">
               <button
-                onClick={() => { setCurrencyFilter("ALL"); setListLoading(true); loadSales(1, search || undefined, "ALL"); }}
+                onClick={() => { setCurrencyFilter("ALL"); setListLoading(true); loadSales(1, search || undefined, "ALL", employeeFilter || undefined); }}
                 className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${currencyFilter === "ALL" ? "bg-white text-dark shadow-sm border border-border" : "text-muted hover:text-dark"}`}
               >
                 Todas
               </button>
               <button
-                onClick={() => { setCurrencyFilter("USD"); setListLoading(true); loadSales(1, search || undefined, "USD"); }}
+                onClick={() => { setCurrencyFilter("USD"); setListLoading(true); loadSales(1, search || undefined, "USD", employeeFilter || undefined); }}
                 className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${currencyFilter === "USD" ? "bg-white text-dark shadow-sm border border-border" : "text-muted hover:text-dark"}`}
               >
                 <span className="inline-flex items-center gap-1">
@@ -748,7 +938,7 @@ export default function VentasPage() {
                 </span>
               </button>
               <button
-                onClick={() => { setCurrencyFilter("BS"); setListLoading(true); loadSales(1, search || undefined, "BS"); }}
+                onClick={() => { setCurrencyFilter("BS"); setListLoading(true); loadSales(1, search || undefined, "BS", employeeFilter || undefined); }}
                 className={`px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${currencyFilter === "BS" ? "bg-white text-dark shadow-sm border border-border" : "text-muted hover:text-dark"}`}
               >
                 <span className="inline-flex items-center gap-1">
@@ -756,6 +946,29 @@ export default function VentasPage() {
                   Bs
                 </span>
               </button>
+            </div>
+
+            {/* Employee filter */}
+            <div className="relative">
+              <select
+                value={employeeFilter}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEmployeeFilter(val);
+                  setListLoading(true);
+                  loadSales(1, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, val || undefined);
+                }}
+                className="select text-xs py-1.5 pr-7 appearance-none bg-white"
+              >
+                <option value="">Todas las empleadas</option>
+                <option value="_unassigned">— Sin asignar —</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+              <svg className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
             </div>
 
             <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -941,7 +1154,7 @@ export default function VentasPage() {
                 setListLoading(true);
                 if (searchTimeout.current) clearTimeout(searchTimeout.current);
                 searchTimeout.current = setTimeout(() => {
-                  loadSales(1, value || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined);
+                  loadSales(1, value || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined);
                 }, 250);
               }}
               placeholder="Buscar ventas..."
@@ -955,7 +1168,7 @@ export default function VentasPage() {
               <EmptyState
                 entity="ventas"
                 title="No se encontraron ventas"
-                description={search || currencyFilter !== "ALL" ? "Prueba con otros filtros." : "Registra tu primera venta para comenzar."}
+                description={search || currencyFilter !== "ALL" || employeeFilter ? "Prueba con otros filtros." : "Registra tu primera venta para comenzar."}
                 action={search || currencyFilter !== "ALL" ? undefined : { label: "+ Nueva Venta", onClick: () => setShowForm(true) }}
               />
             ) : (
@@ -966,11 +1179,61 @@ export default function VentasPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                         <span className="font-semibold text-dark text-sm flex items-center gap-1.5 truncate">
                           {sale.client?.name || "Sin cliente"}
-                          {sale.employee && (
-                            <span className="text-xs font-normal text-muted ml-1 hidden sm:inline">
-                              · {sale.employee.name}
-                            </span>
-                          )}
+                          {/* Employee editing — desktop */}
+                          <span className="hidden sm:inline-flex items-center gap-1 group/employee">
+                            {editingEmployeeId === sale.id ? (
+                              <span className="flex items-center gap-1">
+                                <select
+                                  value={editingEmployeeValue}
+                                  onChange={(e) => setEditingEmployeeValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") saveEditEmployee(sale.id);
+                                    if (e.key === "Escape") cancelEditEmployee();
+                                  }}
+                                  className="select text-xs py-0.5 px-1 w-32"
+                                  autoFocus
+                                >
+                                  <option value="">— Sin asignar —</option>
+                                  {employees.map((emp) => (
+                                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => saveEditEmployee(sale.id)}
+                                  className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                  title="Guardar"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={cancelEditEmployee}
+                                  className="p-0.5 rounded text-muted hover:bg-surface transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </span>
+                            ) : (
+                              <>
+                                <span className="text-xs font-normal text-muted">
+                                  {sale.employee ? `· ${sale.employee.name}` : "· Sin asignar"}
+                                </span>
+                                <button
+                                  onClick={() => startEditEmployee(sale.id, sale.employee?.id ?? null)}
+                                  className="opacity-0 group-hover/employee:opacity-100 p-0.5 rounded text-muted hover:text-primary hover:bg-primary/10 transition-all"
+                                  title="Editar empleada"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </span>
                           {sale.client?.phone && (
                             <button
                               onClick={(e) => {
@@ -986,46 +1249,352 @@ export default function VentasPage() {
                             </button>
                           )}
                         </span>
-                        {sale.employee && (
+                        {/* Employee editing — mobile */}
+                        {editingEmployeeId === sale.id ? (
+                          <span className="flex items-center gap-1 sm:hidden">
+                            <select
+                              value={editingEmployeeValue}
+                              onChange={(e) => setEditingEmployeeValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEditEmployee(sale.id);
+                                if (e.key === "Escape") cancelEditEmployee();
+                              }}
+                              className="select text-xs py-0.5 px-1 w-32"
+                              autoFocus
+                            >
+                              <option value="">— Sin asignar —</option>
+                              {employees.map((emp) => (
+                                <option key={emp.id} value={emp.id}>{emp.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => saveEditEmployee(sale.id)}
+                              className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="Guardar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={cancelEditEmployee}
+                              className="p-0.5 rounded text-muted hover:bg-surface transition-colors"
+                              title="Cancelar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </span>
+                        ) : (
                           <span className="text-xs font-normal text-muted sm:hidden">
-                            · {sale.employee.name}
+                            {sale.employee ? `· ${sale.employee.name}` : "· Sin asignar"}
                           </span>
                         )}
-                        <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium border bg-warning-bg text-warning border-warning/20 w-fit">
-                          {sale.paymentMethod}
+                        <span className="flex items-center gap-1 group/payment w-fit">
+                          {editingPaymentId === sale.id ? (
+                            <div className="flex items-center gap-1">
+                              <select
+                                value={editingPaymentValue}
+                                onChange={(e) => setEditingPaymentValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveEditPayment(sale.id);
+                                  if (e.key === "Escape") cancelEditPayment();
+                                }}
+                                className="select text-[10px] sm:text-xs py-0.5 px-1.5 w-28"
+                                autoFocus
+                              >
+                                {paymentMethods.map((m) => (
+                                  <option key={m} value={m}>{m}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => saveEditPayment(sale.id)}
+                                className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                title="Guardar"
+                              >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={cancelEditPayment}
+                                className="p-0.5 rounded text-muted hover:bg-surface transition-colors"
+                                title="Cancelar"
+                              >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium border bg-warning-bg text-warning border-warning/20">
+                                {sale.paymentMethod}
+                              </span>
+                              <button
+                                onClick={() => startEditPayment(sale.id, sale.paymentMethod)}
+                                className="opacity-0 group-hover/payment:opacity-100 p-0.5 rounded text-muted hover:text-primary hover:bg-primary/10 transition-all"
+                                title="Editar método de pago"
+                              >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
                         </span>
                       </div>
-                      <p className="text-xs text-muted mt-1">
-                        {new Date(sale.date).toLocaleDateString("es-MX", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-1 group/date">
+                        {editingDateId === sale.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="date"
+                              value={editingDateValue}
+                              onChange={(e) => setEditingDateValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEditDate(sale.id);
+                                if (e.key === "Escape") cancelEditDate();
+                              }}
+                              className="input text-xs py-1 px-2 w-36"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => saveEditDate(sale.id)}
+                              className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="Guardar"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={cancelEditDate}
+                              className="p-1 rounded-md text-muted hover:bg-surface transition-colors"
+                              title="Cancelar"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-xs text-muted">
+                              {new Date(sale.date).toLocaleDateString("es-MX", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            <button
+                              onClick={() => startEditDate(sale.id, sale.date)}
+                              className="opacity-0 group-hover/date:opacity-100 p-0.5 rounded text-muted hover:text-primary hover:bg-primary/10 transition-all"
+                              title="Editar fecha"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {sale.items.map((item, idx) => (
                           <span key={idx} className="text-xs text-muted">
                             {item.service?.name || item.product?.name || "Producto"}
                             {idx < sale.items.length - 1 ? ", " : ""}
                           </span>
-                        )                        )}
+                        ))}
+                      </div>
+
+                      {/* Notes editing */}
+                      <div className="flex items-center gap-1.5 mt-1.5 group/notes">
+                        {editingNotesId === sale.id ? (
+                          <div className="flex items-center gap-1 w-full max-w-xs">
+                            <input
+                              type="text"
+                              value={editingNotesValue}
+                              onChange={(e) => setEditingNotesValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") saveEditNotes(sale.id);
+                                if (e.key === "Escape") cancelEditNotes();
+                              }}
+                              placeholder="Agregar nota..."
+                              className="input text-xs py-1 px-2 flex-1"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => saveEditNotes(sale.id)}
+                              className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors flex-shrink-0"
+                              title="Guardar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={cancelEditNotes}
+                              className="p-1 rounded text-muted hover:bg-surface transition-colors flex-shrink-0"
+                              title="Cancelar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            {sale.notes ? (
+                              <span className="text-xs text-muted/70 flex items-center gap-1">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                                </svg>
+                                {sale.notes}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted/40 italic">Sin nota</span>
+                            )}
+                            <button
+                              onClick={() => startEditNotes(sale.id, sale.notes)}
+                              className="opacity-0 group-hover/notes:opacity-100 p-0.5 rounded text-muted hover:text-primary hover:bg-primary/10 transition-all"
+                              title={sale.notes ? "Editar nota" : "Agregar nota"}
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 ml-2 sm:ml-4">
-                      <p className="font-bold text-lg text-dark">${sale.total.toFixed(2)} USD</p>
-                      {sale.totalBs && (
-                        <div className="mt-0.5">
-                          <p className="text-sm font-semibold text-amber-700">Bs {sale.totalBs.toFixed(2)}</p>
-                          {sale.exchangeRate && (
-                            <p className="text-[10px] text-muted">@ tasa {sale.exchangeRate}</p>
-                          )}
-                        </div>
-                      )}
+                      {/* Total USD editing */}
+                      <div className="flex items-center justify-end gap-1 group/total">
+                        {editingTotalId === sale.id ? (
+                          <div className="flex items-center gap-1">
+                            <div className="relative w-24">
+                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted pointer-events-none">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={editingTotalValue}
+                                onChange={(e) => setEditingTotalValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveEditTotal(sale.id);
+                                  if (e.key === "Escape") cancelEditTotal();
+                                }}
+                                className="w-full pl-5 pr-1.5 py-1 text-sm font-bold text-dark bg-white border border-primary/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                autoFocus
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted font-medium">USD</span>
+                            <button
+                              onClick={() => saveEditTotal(sale.id)}
+                              className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="Guardar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={cancelEditTotal}
+                              className="p-0.5 rounded text-muted hover:bg-surface transition-colors"
+                              title="Cancelar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-bold text-lg text-dark">${sale.total.toFixed(2)} USD</p>
+                            <button
+                              onClick={() => startEditTotal(sale.id, sale.total)}
+                              className="opacity-0 group-hover/total:opacity-100 p-0.5 rounded text-muted hover:text-primary hover:bg-primary/10 transition-all"
+                              title="Editar total USD"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Total Bs editing */}
+                      <div className="flex items-center justify-end gap-1 mt-0.5 group/bs">
+                        {editingTotalBsId === sale.id ? (
+                          <div className="flex items-center gap-1">
+                            <div className="relative w-24">
+                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[11px] text-muted pointer-events-none">Bs</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={editingTotalBsValue}
+                                onChange={(e) => setEditingTotalBsValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") saveEditTotalBs(sale.id);
+                                  if (e.key === "Escape") cancelEditTotalBs();
+                                }}
+                                className="w-full pl-7 pr-1.5 py-0.5 text-xs font-semibold text-amber-800 bg-amber-50/50 border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-200/50"
+                                placeholder="0.00"
+                                autoFocus
+                              />
+                            </div>
+                            <button
+                              onClick={() => saveEditTotalBs(sale.id)}
+                              className="p-0.5 rounded text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="Guardar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={cancelEditTotalBs}
+                              className="p-0.5 rounded text-muted hover:bg-surface transition-colors"
+                              title="Cancelar"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            {sale.totalBs !== null ? (
+                              <>
+                                <p className="text-sm font-semibold text-amber-700">Bs {sale.totalBs.toFixed(2)}</p>
+                                {sale.exchangeRate && (
+                                  <span className="text-[10px] text-muted">@ tasa {sale.exchangeRate}</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-[10px] text-muted/40 italic">Sin Bs</span>
+                            )}
+                            <button
+                              onClick={() => startEditTotalBs(sale.id, sale.totalBs)}
+                              className="opacity-0 group-hover/bs:opacity-100 p-0.5 rounded text-muted hover:text-primary hover:bg-primary/10 transition-all"
+                              title={sale.totalBs !== null ? "Editar monto Bs" : "Agregar monto Bs"}
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+
                       <button
                         onClick={() => setDeleteTarget(sale.id)}
-                        className="text-xs text-muted hover:text-danger transition-colors mt-1 opacity-0 group-hover:opacity-100"
+                        className="text-xs text-muted hover:text-danger transition-colors mt-1.5 opacity-0 group-hover:opacity-100"
                       >
                         Eliminar
                       </button>
@@ -1043,7 +1612,7 @@ export default function VentasPage() {
             pageLoading={pageLoading}
             itemLabel="venta"
             limit={15}
-            onPageChange={(p) => { setPageLoading(true); loadSales(p, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined); }}
+            onPageChange={(p) => { setPageLoading(true); loadSales(p, search || undefined, currencyFilter !== "ALL" ? currencyFilter : undefined, employeeFilter || undefined); }}
           />
 
           <WAChatPopover

@@ -104,6 +104,7 @@ export const POST = withCsrf(async (req: NextRequest) => {
     const sale = await prisma.$transaction(async (tx) => {
       const s = await tx.sale.create({
         data: {
+          date: serviceDate,
           total,
           paymentMethod: paymentSplits && paymentSplits.length > 0 ? null : (paymentMethod || "EFECTIVO"),
           exchangeRate: exchangeRate || null,
