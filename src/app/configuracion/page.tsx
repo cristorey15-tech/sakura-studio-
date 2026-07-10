@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import CollapsibleSection from "@/components/CollapsibleSection";
 import { SkeletonPageHeader, SkeletonBlock, SkeletonLine } from "@/components/LoadingSkeleton";
 import { apiFetch } from "@/lib/api";
+import { useWATemplates, renderTemplate } from "@/hooks/useWATemplates";
 
 interface StudioSettings {
   id: number;
@@ -91,6 +92,13 @@ export default function ConfiguracionPage() {
   const [resetResult, setResetResult] = useState<{ success: boolean; message: string } | null>(null);
   const [fixingSequences, setFixingSequences] = useState(false);
   const [fixResult, setFixResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // WhatsApp templates state
+  const { templates, addTemplate, editTemplate, deleteTemplate, resetDefaults } = useWATemplates();
+  const [waNewLabel, setWaNewLabel] = useState("");
+  const [waNewMessage, setWaNewMessage] = useState("");
+  const [waEditing, setWaEditing] = useState<{ id: number; label: string; message: string } | null>(null);
+  const [waShowForm, setWaShowForm] = useState(false);
 
   const handleConfirmImport = async () => {
     const file = pendingImportFile;
@@ -910,6 +918,177 @@ export default function ConfiguracionPage() {
               </div>
             </div>
           )}
+          </CollapsibleSection>
+        </div>
+
+        {/* ═══════════════ Plantillas WhatsApp ═══════════════ */}
+        <div className="pt-6 border-t border-border -mx-4 sm:-mx-6 px-4 sm:px-6">
+          <CollapsibleSection title="Plantillas de WhatsApp">
+            <p className="text-xs text-muted mb-4">
+              Gestiona las plantillas de mensajes para WhatsApp. Usa <code className="text-[#25D366] bg-[#25D366]/10 px-1 rounded text-[11px]">{"{nombre}"}</code> o <code className="text-[#25D366] bg-[#25D366]/10 px-1 rounded text-[11px]">{"[nombre]"}</code> para el nombre del cliente.
+            </p>
+
+            {/* Add new / Edit form */}
+            {(waShowForm || waEditing) && (
+              <div className="mb-4 p-4 bg-surface rounded-xl border border-border">
+                <h4 className="text-sm font-medium text-dark mb-3">
+                  {waEditing ? "Editar plantilla" : "Nueva plantilla"}
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted mb-1">Etiqueta</label>
+                    <input
+                      type="text"
+                      value={waEditing ? waEditing.label : waNewLabel}
+                      onChange={(e) =>
+                        waEditing
+                          ? setWaEditing({ ...waEditing, label: e.target.value })
+                          : setWaNewLabel(e.target.value)
+                      }
+                      className="input py-2 text-sm"
+                      placeholder="Ej: Recordatorio"
+                      maxLength={30}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted mb-1">Mensaje</label>
+                    <textarea
+                      value={waEditing ? waEditing.message : waNewMessage}
+                      onChange={(e) =>
+                        waEditing
+                          ? setWaEditing({ ...waEditing, message: e.target.value })
+                          : setWaNewMessage(e.target.value)
+                      }
+                      className="input min-h-[80px] resize-none text-sm"
+                      placeholder="Ej: Hola {nombre}, recordatorio..."
+                      maxLength={500}
+                    />
+                    <p className="text-[11px] text-muted mt-1">
+                      <code className="text-[#25D366]">{"{nombre}"}</code> se reemplazará con el nombre del cliente
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (waEditing) {
+                          editTemplate(waEditing.id, waEditing.label, waEditing.message);
+                          setWaEditing(null);
+                        } else {
+                          addTemplate(waNewLabel, waNewMessage);
+                          setWaNewLabel("");
+                          setWaNewMessage("");
+                        }
+                        setWaShowForm(false);
+                      }}
+                      disabled={
+                        waEditing
+                          ? !waEditing.label.trim() || !waEditing.message.trim()
+                          : !waNewLabel.trim() || !waNewMessage.trim()
+                      }
+                      className="px-3 py-1.5 bg-[#25D366] text-white rounded-lg text-xs font-medium hover:bg-[#20BD5C] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      {waEditing ? "Guardar cambios" : "Agregar plantilla"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWaEditing(null);
+                        setWaShowForm(false);
+                        setWaNewLabel("");
+                        setWaNewMessage("");
+                      }}
+                      className="px-3 py-1.5 btn-secondary text-xs"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Template list */}
+            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+              {templates.length === 0 ? (
+                <div className="text-center py-8 text-muted">
+                  <p className="text-sm">No hay plantillas. ¡Crea una!</p>
+                </div>
+              ) : (
+                templates.map((tpl) => (
+                  <div
+                    key={tpl.id}
+                    className="flex items-start gap-3 p-3 bg-surface rounded-xl border border-border group hover:border-primary/20 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-dark">{tpl.label}</p>
+                      <p className="text-xs text-muted mt-0.5 line-clamp-2">
+                        {renderTemplate(tpl.message, "Cliente")}
+                      </p>
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWaEditing({ id: tpl.id, label: tpl.label, message: tpl.message });
+                          setWaShowForm(false);
+                          setWaNewLabel("");
+                          setWaNewMessage("");
+                        }}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-primary-bg text-muted hover:text-primary transition-colors"
+                        title="Editar"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteTemplate(tpl.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-danger-bg text-muted hover:text-danger transition-colors"
+                        title="Eliminar"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add template + Restore defaults */}
+            <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
+              <button
+                type="button"
+                onClick={() => {
+                  setWaEditing(null);
+                  setWaShowForm(true);
+                  setWaNewLabel("");
+                  setWaNewMessage("");
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[#25D366] text-white hover:bg-[#20BD5C] transition-all"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Nueva plantilla
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("¿Restaurar plantillas por defecto? Las personalizadas se perderán.")) {
+                    resetDefaults();
+                  }
+                }}
+                className="flex items-center gap-1 text-xs text-muted hover:text-dark transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Restaurar defaults
+              </button>
+            </div>
           </CollapsibleSection>
         </div>
 

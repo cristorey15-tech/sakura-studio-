@@ -74,6 +74,8 @@ export async function GET(request: Request) {
       yesterdayAppointments,
       newClientsThisMonth,
       lastMonthSalesAgg,
+      // Nuevos clientes del mes (detalles)
+      newClients,
       // Servicios completados esta semana por cada empleada
       servicesByEmployee,
     ] = await Promise.all([
@@ -110,8 +112,9 @@ export async function GET(request: Request) {
         by: ["category"],
         _count: true,
       }),
-      // Citas COMPLETADAS esta semana
+      // Citas COMPLETADAS esta semana (limitado a 100)
       prisma.appointment.findMany({
+        take: 100,
         where: {
           date: { gte: sunday, lt: saturday },
           status: "COMPLETADA",
@@ -120,14 +123,17 @@ export async function GET(request: Request) {
           service: { select: { category: true } },
         },
       }),
-      prisma.product.findMany().then((products) =>
+      prisma.product.findMany({
+        take: 50,
+      }).then((products) =>
         products.filter((p) => p.quantity <= p.minStock)
       ),
-      // Ventas de los últimos 12 meses
+      // Ventas de los últimos 12 meses (limitado a 200 para rendimiento)
       prisma.sale.findMany({
         where: { date: { gte: twelveMonthsAgo }, ...empFilter },
         select: { date: true, total: true },
         orderBy: { date: "asc" },
+        take: 500,
       }),
       // Servicios más reservados (top 5)
       prisma.appointment.groupBy({
@@ -223,6 +229,13 @@ export async function GET(request: Request) {
         _sum: { total: true },
         where: { date: { gte: startOfMonthMinus1, lt: startOfMonth }, ...empFilter },
       }),
+      // Nuevos clientes del mes
+      prisma.client.findMany({
+        where: { createdAt: { gte: startOfMonth } },
+        select: { id: true, name: true, phone: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
       // Servicios completados esta semana por cada empleada
       prisma.appointment.groupBy({
         by: ["employeeId"],
@@ -298,6 +311,38 @@ export async function GET(request: Request) {
       });
     }
 
+    // ─── Clientes inactivos (30+ días sin servicio COMPLETADO, con teléfono) ───
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const clientsWithPhone = await prisma.client.findMany({
+      where: {
+        phone: { not: null },
+        NOT: { phone: "" },
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        appointments: {
+          take: 1,
+          orderBy: { date: "desc" },
+          where: { status: "COMPLETADA" },
+          select: { date: true },
+        },
+      },
+    });
+    const inactiveClientsData = clientsWithPhone.filter(
+      (c) => !c.appointments[0] || c.appointments[0].date < thirtyDaysAgo
+    );
+
+    const inactiveClientsCount = inactiveClientsData.length;
+    const inactiveClients = inactiveClientsData.map((c) => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      lastVisit: c.appointments[0]?.date?.toISOString() ?? null,
+    }));
+
     return NextResponse.json({
       totalClients,
       totalServices,
@@ -321,6 +366,9 @@ export async function GET(request: Request) {
       yesterdayAppointments,
       newClientsThisMonth,
       lastMonthSales: lastMonthSalesAgg._sum.total || 0,
+      inactiveClientsCount,
+      inactiveClients,
+      newClients,
     });
   } catch (error) {
     console.error("Dashboard API error:", error);

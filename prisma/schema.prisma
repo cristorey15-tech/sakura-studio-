@@ -183,3 +183,4 @@ model PaymentSplit {
   amountBs      Float? // Monto en Bs (si aplica)
   sale          Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
 }
+

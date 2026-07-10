@@ -9,7 +9,17 @@ export interface WATemplate {
 }
 
 export function renderTemplate(message: string, clientName: string): string {
-  return message.replace(/\{nombre\}/g, clientName);
+  const fecha = new Date().toLocaleDateString("es-MX", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+  let result = message
+    .replace(/\{nombre\}/g, clientName)
+    .replace(/\[nombre\]/g, clientName)
+    .replace(/\{fecha\}/g, fecha)
+    .replace(/\[fecha\]/g, fecha);
+  // Limpiar cualquier placeholder que haya quedado sin reemplazar
+  result = result.replace(/\{[^}]+\}/g, "").replace(/\[[^\]]+\]/g, "");
+  return result;
 }
 
 export function useWATemplates() {

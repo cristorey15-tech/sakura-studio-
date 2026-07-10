@@ -20,7 +20,9 @@ export default function WAChatPopover({ isOpen, clientName, clientPhone, onClose
   const sendWhatsApp = (phone: string, msg: string) => {
     if (!phone.trim() || !msg.trim()) return;
     const cleaned = phone.replace(/\D/g, "");
-    const full = cleaned.startsWith("52") ? cleaned : `52${cleaned}`;
+    // Formato Venezuela: remover 0 inicial y agregar +58
+    const withoutZero = cleaned.startsWith("0") ? cleaned.slice(1) : cleaned;
+    const full = withoutZero.startsWith("58") ? withoutZero : `58${withoutZero}`;
     const text = encodeURIComponent(msg);
     window.open(`https://wa.me/${full}?text=${text}`, "_blank", "noopener,noreferrer");
     onClose();

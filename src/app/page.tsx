@@ -8,18 +8,11 @@ import { apiFetch } from "@/lib/api";
 import { useSSE } from "@/hooks/useSSE";
 import { SkeletonPageHeader, SkeletonBlock, SkeletonStatsRow } from "@/components/LoadingSkeleton";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-} from "recharts";
+import DashboardWAReminder from "@/components/DashboardWAReminder";
+import DashboardMonthlyChart from "@/components/DashboardMonthlyChart";
+import DashboardTopServicesChart from "@/components/DashboardTopServicesChart";
+import DashboardWeeklyServicesChart from "@/components/DashboardWeeklyServicesChart";
+import DashboardServicesByEmployeeChart from "@/components/DashboardServicesByEmployeeChart";
 
 interface DashboardData {
   totalClients: number;
@@ -50,6 +43,9 @@ interface DashboardData {
   yesterdayAppointments: number;
   newClientsThisMonth: number;
   lastMonthSales: number;
+  inactiveClientsCount: number;
+  inactiveClients: Array<{ id: number; name: string; phone: string | null; lastVisit: string | null }>;
+  newClients: Array<{ id: number; name: string; phone: string | null; createdAt: string }>;
 }
 
 const statusColors: Record<string, string> = {
@@ -75,6 +71,7 @@ export default function Dashboard() {
   const [showMonths, setShowMonths] = useState<6 | 12>(12);
   const [dashboardEmployeeFilter, setDashboardEmployeeFilter] = useState("");
   const [employees, setEmployees] = useState<{ id: number; name: string }[]>([]);
+  const [waExpandKey, setWaExpandKey] = useState(0);
 
   // ─── Attendance state ───
   const [attendanceState, setAttendanceState] = useState<{
@@ -377,7 +374,6 @@ export default function Dashboard() {
     : [...allStats.filter(s => s.label !== "Ventas del Mes"), employeeStat];
 
   const totalWeeklyCompleted = data.weeklyCompletedByCategory.reduce((acc, s) => acc + s._count, 0);
-  const filteredTrend = showMonths === 6 ? data.monthlyTrend.slice(-6) : data.monthlyTrend;
 
   return (
     <div className="animate-fadeIn flex flex-col gap-4 flex-1 min-h-0">
@@ -407,8 +403,234 @@ export default function Dashboard() {
               ))}
             </select>
           )}
-          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-border shadow-sm text-sm text-muted">
-            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+          {/* Compact attendance check-in */}
+          {!attendanceState.loading && (
+            attendanceState.checkedIn ? (
+              <div className="relative group/tooltip">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-success/30 bg-success-bg/50 text-xs font-medium text-success shadow-sm">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Presente
+                </div>
+                {/* Tooltip */}
+                <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-white rounded-xl border border-border shadow-lg z-50 opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 translate-y-1 group-hover/tooltip:translate-y-0 pointer-events-none">
+                  <div className="text-xs space-y-1.5">
+                    <p className="font-semibold text-success flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Asistencia registrada
+                    </p>
+                    <div className="h-px bg-border" />
+                    {attendanceState.schedule && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Horario hoy</span>
+                        <span className="font-medium text-dark">{attendanceState.schedule.startTime} - {attendanceState.schedule.endTime}</span>
+                      </div>
+                    )}
+                    {attendanceState.workLocation?.name && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Ubicación</span>
+                        <span className="font-medium text-dark truncate max-w-[140px]">{attendanceState.workLocation.name}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute bottom-full right-4 w-3 h-3 bg-white border-l border-t border-border rotate-45 -mb-1.5" />
+                </div>
+              </div>
+            ) : (
+              <div className="relative group/tooltip">
+                <button
+                  onClick={handleCheckIn}
+                  disabled={attendanceState.checking || !attendanceState.schedule}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  {attendanceState.checking ? (
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                    </svg>
+                  )}
+                  Entrada
+                </button>
+                {/* Tooltip */}
+                <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-white rounded-xl border border-border shadow-lg z-50 opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 translate-y-1 group-hover/tooltip:translate-y-0 pointer-events-none">
+                  <div className="text-xs space-y-1.5">
+                    <p className="font-semibold text-amber-700 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                      </svg>
+                      Marcar entrada
+                    </p>
+                    <div className="h-px bg-border" />
+                    {attendanceState.schedule ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Horario hoy</span>
+                        <span className="font-medium text-dark">{attendanceState.schedule.startTime} - {attendanceState.schedule.endTime}</span>
+                      </div>
+                    ) : (
+                      <p className="text-muted">No tienes horario asignado para hoy</p>
+                    )}
+                    {attendanceState.workLocation?.name && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Ubicación</span>
+                        <span className="font-medium text-dark truncate max-w-[140px]">{attendanceState.workLocation.name}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute bottom-full right-4 w-3 h-3 bg-white border-l border-t border-border rotate-45 -mb-1.5" />
+                </div>
+              </div>
+            )
+          )}
+          {/* New clients this month badge (admin only) */}
+          {isAdmin && data && data.newClients.length > 0 && (
+            <div className="relative group/tooltip">
+              <Link
+                href="/clientes"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-blue-300 bg-blue-50 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-all duration-200 shadow-sm"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                </svg>
+                +{data.newClients.length} nuevos
+              </Link>
+              {/* Tooltip */}
+              <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-white rounded-xl border border-border shadow-lg z-50 opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 translate-y-1 group-hover/tooltip:translate-y-0 pointer-events-none">
+                <div className="text-xs space-y-1.5">
+                  <p className="font-semibold text-blue-700 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
+                    {data.newClients.length} {data.newClients.length === 1 ? "nuevo cliente" : "nuevos clientes"} este mes
+                  </p>
+                  <div className="h-px bg-border" />
+                  <div className="max-h-40 overflow-y-auto space-y-1.5">
+                    {data.newClients.slice(0, 20).map((c) => (
+                      <div key={c.id} className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-medium text-dark truncate">{c.name}</p>
+                          <p className="text-[10px] text-muted/70">{c.phone || "Sin teléfono"}</p>
+                        </div>
+                        <span className="text-[10px] text-muted flex-shrink-0">
+                          {new Date(c.createdAt).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                        </span>
+                      </div>
+                    ))}
+                    {data.newClients.length > 20 && (
+                      <p className="text-[10px] text-muted text-center pt-1">...y {data.newClients.length - 20} más</p>
+                    )}
+                  </div>
+                </div>
+                <div className="absolute bottom-full right-4 w-3 h-3 bg-white border-l border-t border-border rotate-45 -mb-1.5" />
+              </div>
+            </div>
+          )}
+          {/* Low stock badge (admin only) */}
+          {isAdmin && data.lowStockProducts.length > 0 && (
+            <div className="relative group/tooltip">
+              <Link
+                href="/inventario"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all duration-200 shadow-sm ${
+                  data.lowStockProducts.some((p) => p.quantity <= p.minStock * 0.3)
+                    ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                    : "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                </svg>
+                {data.lowStockProducts.length} por reponer
+              </Link>
+              {/* Tooltip */}
+              <div className="absolute top-full right-0 mt-2 w-64 p-3 bg-white rounded-xl border border-border shadow-lg z-50 opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 translate-y-1 group-hover/tooltip:translate-y-0 pointer-events-none">
+                <div className="text-xs space-y-1.5">
+                  <p className="font-semibold flex items-center gap-1.5 text-red-700">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                    </svg>
+                    Productos por reponer
+                  </p>
+                  <div className="h-px bg-border" />
+                  <div className="max-h-40 overflow-y-auto space-y-1.5">
+                    {data.lowStockProducts.map((p) => {
+                      const isCritial = p.quantity <= p.minStock * 0.3;
+                      return (
+                        <div key={p.id} className="flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-medium text-dark truncate">{p.name}</p>
+                          </div>
+                          <span className={`text-[10px] font-semibold flex-shrink-0 px-1.5 py-0.5 rounded ${
+                            isCritial ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                          }`}>
+                            {p.quantity}/{p.minStock}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="absolute bottom-full right-4 w-3 h-3 bg-white border-l border-t border-border rotate-45 -mb-1.5" />
+              </div>
+            </div>
+          )}
+          {/* Inactive clients badge (admin only) */}
+          {isAdmin && data && data.inactiveClientsCount > 0 && (
+            <div className="relative group/tooltip">
+              <button
+                onClick={() => {
+                  setWaExpandKey((k) => k + 1);
+                  document.getElementById("whatsapp-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-all duration-200 shadow-sm"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                {data.inactiveClientsCount} inactivos
+              </button>
+              {/* Tooltip */}
+              <div className="absolute top-full right-0 mt-2 w-72 p-3 bg-white rounded-xl border border-border shadow-lg z-50 opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 translate-y-1 group-hover/tooltip:translate-y-0 pointer-events-none">
+                <div className="text-xs space-y-2">
+                  <p className="font-semibold text-amber-800 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    {data.inactiveClientsCount} {data.inactiveClientsCount === 1 ? "cliente sin servicio" : "clientes sin servicio"} en 30+ días
+                  </p>
+                  <div className="max-h-48 overflow-y-auto space-y-1.5">
+                    {data.inactiveClients.map((c) => (
+                      <div key={c.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-medium text-dark truncate">{c.name}</p>
+                          <p className="text-[10px] text-muted/70">{c.phone || "Sin teléfono"}</p>
+                        </div>
+                        <span className="text-[10px] text-amber-700 font-medium flex-shrink-0">
+                          {c.lastVisit
+                            ? new Date(c.lastVisit).toLocaleDateString("es-MX", { day: "numeric", month: "short" })
+                            : "Sin visitas"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted pt-1 border-t border-border">
+                    👆 Haz clic para ir a WhatsApp y enviar promociones
+                  </p>
+                </div>
+                {/* Arrow */}
+                <div className="absolute bottom-full right-4 w-3 h-3 bg-white border-l border-t border-border rotate-45 -mb-1.5" />
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white rounded-lg border border-border shadow-sm text-xs text-muted">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
             {new Date().toLocaleDateString("es-MX", {
               weekday: "long",
               year: "numeric",
@@ -458,83 +680,8 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ═══════════ Check-in / Asistencia ═══════════ */}
-      {!attendanceState.loading && (
-        <div className={`rounded-xl border p-4 transition-all duration-300 ${
-          attendanceState.checkedIn
-            ? "bg-success-bg/40 border-success/30"
-            : "bg-primary-bg/30 border-primary/20"
-        }`}>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                attendanceState.checkedIn
-                  ? "bg-success-bg"
-                  : "bg-primary-bg"
-              }`}>
-                {attendanceState.checkedIn ? (
-                  <svg className="w-5 h-5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                  </svg>
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className={`text-sm font-semibold ${
-                  attendanceState.checkedIn ? "text-success" : "text-primary"
-                }`}>
-                  {attendanceState.checkedIn
-                    ? "Asistencia registrada hoy ✅"
-                    : "Registrar asistencia"
-                  }
-                </p>
-                <p className="text-xs text-muted mt-0.5">
-                  {attendanceState.schedule
-                    ? `Horario hoy: ${attendanceState.schedule.startTime} - ${attendanceState.schedule.endTime}`
-                    : attendanceState.checkedIn
-                    ? "Ya registraste tu entrada"
-                    : "No tienes horario asignado para hoy"}
-                  {attendanceState.workLocation?.name && (
-                    <> · {attendanceState.workLocation.name}</>
-                  )}
-                </p>
-              </div>
-            </div>
-            {!attendanceState.checkedIn && (
-              <button
-                onClick={handleCheckIn}
-                disabled={attendanceState.checking || !attendanceState.schedule}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-dark transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm flex-shrink-0"
-              >
-                {attendanceState.checking ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Verificando ubicación...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                    </svg>
-                    Marcar Entrada
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-          {attendanceState.error && (
-            <p className="text-xs text-danger mt-2 ml-[3.25rem]">{attendanceState.error}</p>
-          )}
-        </div>
-      )}
+      {/* ═══════════ Recordatorios WhatsApp (Admin) ═══════════ */}
+      {isAdmin && <div id="whatsapp-panel"><DashboardWAReminder expandTrigger={waExpandKey} /></div>}
 
       {/* ═══════════ Tendencia Mes vs Mes Anterior (solo ADMIN) ═══════════ */}
       {isAdmin && data.monthlyTrend.length >= 2 && (() => {
@@ -582,240 +729,20 @@ export default function Dashboard() {
 
       {/* ═══════════ Gráfica: Ingresos Mensuales (solo ADMIN) ═══════════ */}
       {isAdmin && (
-      <div className="card p-5">
-        <div className="section-header mb-4">
-          <span className="section-accent" />
-          <h2 className="section-title">Ingresos Mensuales</h2>
-          <div className="ml-auto flex items-center gap-1 p-0.5 bg-surface rounded-lg border border-border">
-            <button
-              onClick={() => setShowMonths(6)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
-                showMonths === 6
-                  ? "bg-white text-dark shadow-sm border border-border"
-                  : "text-muted hover:text-dark"
-              }`}
-            >
-              6 meses
-            </button>
-            <button
-              onClick={() => setShowMonths(12)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
-                showMonths === 12
-                  ? "bg-white text-dark shadow-sm border border-border"
-                  : "text-muted hover:text-dark"
-              }`}
-            >
-              12 meses
-            </button>
-          </div>
-        </div>
-        {data.monthlyTrend.length === 0 || data.monthlyTrend.every((m) => m.total === 0) ? (
-          <div className="flex flex-col items-center justify-center text-center py-10">
-            <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-primary-bg flex items-center justify-center">
-              <svg className="w-7 h-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-muted">Sin datos de ingresos</p>
-            <p className="text-xs text-muted/60 mt-1">Los ingresos mensuales aparecerán aquí cuando registres ventas</p>
-          </div>
-        ) : (
-          <div className="mt-2">
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart
-                data={filteredTrend}
-                margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
-                  tickLine={false}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value: number) =>
-                    value >= 1000 ? `$${(value / 1000).toFixed(0)}k` : `$${value}`
-                  }
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#fff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    fontSize: "12px",
-                  }}
-                  formatter={(value: number) => [formatter.format(value), "Ingresos"]}
-                  labelStyle={{ fontWeight: 600, marginBottom: 4 }}
-                />
-                <Line
-                  name="total"
-                  type="monotone"
-                  dataKey="total"
-                  stroke="#6366f1"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: "#6366f1", strokeWidth: 2, stroke: "#fff" }}
-                  activeDot={{ r: 6, fill: "#6366f1", strokeWidth: 2, stroke: "#fff" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
+        <DashboardMonthlyChart
+          monthlyTrend={data.monthlyTrend}
+          showMonths={showMonths}
+          onToggleMonths={setShowMonths}
+          formatter={formatter}
+        />
       )}
 
       {/* ═══════════ Servicios Populares + Servicios de la Semana ═══════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-        {/* ─── Servicios Más Populares ─── */}
-        <div className="card p-5">
-          <div className="section-header mb-4">
-            <span className="section-accent" />
-            <h2 className="section-title">Servicios Más Populares</h2>
-            <span className="text-[10px] text-muted font-medium ml-auto px-2 py-0.5 rounded-full bg-surface border border-border">
-              Por reservas
-            </span>
-          </div>
-          {data.topServices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center text-center py-10">
-              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-violet-50 flex items-center justify-center">
-                <svg className="w-7 h-7 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-muted">Sin reservas aún</p>
-              <p className="text-xs text-muted/60 mt-1">Los servicios más reservados aparecerán aquí</p>
-            </div>
-          ) : (
-            <div className="mt-2">
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart
-                  data={data.topServices}
-                  layout="vertical"
-                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 11, fill: "#94a3b8" }}
-                    tickLine={false}
-                    axisLine={false}
-                    allowDecimals={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 11, fill: "#334155" }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={160}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#fff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                      fontSize: "12px",
-                    }}
-                    formatter={(value: number, name: string) => [value, "Reservas"]}
-                  />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={20}>
-                    {data.topServices.map((s) => (
-                      <Cell key={`ts-${s.id}`} fill={CHART_COLORS[s.id % CHART_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+        <DashboardTopServicesChart topServices={data.topServices} />
 
-        {/* ─── Servicios de la Semana ─── */}
-        <div className="card p-5">
-          <div className="section-header mb-4">
-            <span className="section-accent" />
-            <h2 className="section-title">Servicios de la Semana</h2>
-            <span className="text-[10px] text-muted font-medium ml-auto px-2 py-0.5 rounded-full bg-surface border border-border">
-              Esta semana
-            </span>
-          </div>
-          {!data.weeklyServices || data.weeklyServices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center text-center py-10">
-              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-rose-50 flex items-center justify-center">
-                <svg className="w-7 h-7 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-muted">Sin servicios esta semana</p>
-              <p className="text-xs text-muted/60 mt-1">Los servicios realizados esta semana aparecerán aquí al completar citas</p>
-            </div>
-          ) : (
-            <div className="mt-2">
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart
-                  data={data.weeklyServices}
-                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="serviceName"
-                    tick={{ fontSize: 9, fill: "#334155" }}
-                    tickLine={false}
-                    axisLine={{ stroke: "#e2e8f0" }}
-                    interval={0}
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: "#94a3b8" }}
-                    tickLine={false}
-                    axisLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#fff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                      fontSize: "12px",
-                    }}
-                    formatter={(value: number, name: string, props: any) => [value, props.payload.category ? `${props.payload.category}` : "Servicios"]}
-                    labelStyle={{ fontWeight: 600, marginBottom: 4 }}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={24}>
-                    {data.weeklyServices.map((s) => (
-                      <Cell key={`ws-${s.serviceId}`} fill={CHART_COLORS[s.serviceId % CHART_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-3 flex flex-wrap gap-2 justify-center">
-                {data.weeklyServices.map((s, idx) => (
-                  <span
-                    key={`badge-${s.serviceId ?? idx}`}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full"
-                    style={{
-                      backgroundColor: CHART_COLORS[(s.serviceId ?? 0) % CHART_COLORS.length] + "12",
-                      color: CHART_COLORS[(s.serviceId ?? 0) % CHART_COLORS.length],
-                    }}
-                  >
-                    <span className="font-bold">{s.count}</span>
-                    {s.serviceName}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <DashboardWeeklyServicesChart weeklyServices={data.weeklyServices} />
       </div>
 
       {/* ─── Top Clientes (solo ADMIN) ─── */}
@@ -1016,65 +943,7 @@ export default function Dashboard() {
 
       {/* ═══════════ Servicios por Empleada (esta semana) ═══════════ */}
       {isAdmin && data.servicesByEmployee && data.servicesByEmployee.length > 0 && (
-        <div className="card p-5">
-          <div className="section-header mb-4">
-            <span className="section-accent" />
-            <h2 className="section-title">Servicios por Empleada</h2>
-            <span className="text-[10px] text-muted font-medium ml-auto px-2 py-0.5 rounded-full bg-surface border border-border">
-              Esta semana
-            </span>
-          </div>
-          {data.servicesByEmployee.length === 0 || data.servicesByEmployee.every(s => s.count === 0) ? (
-            <div className="flex flex-col items-center justify-center text-center py-10">
-              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-primary-bg flex items-center justify-center">
-                <svg className="w-7 h-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-muted">Sin servicios esta semana</p>
-              <p className="text-xs text-muted/60 mt-1">Completa citas para ver los resultados aquí</p>
-            </div>
-          ) : (
-            <div className="mt-2">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={data.servicesByEmployee}
-                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="employeeName"
-                    tick={{ fontSize: 12, fill: "#334155" }}
-                    tickLine={false}
-                    axisLine={{ stroke: "#e2e8f0" }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: "#94a3b8" }}
-                    tickLine={false}
-                    axisLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#fff",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                      fontSize: "12px",
-                    }}
-                    formatter={(value: number) => [value, "Servicios"]}
-                    labelStyle={{ fontWeight: 600, marginBottom: 4 }}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={48}>
-                    {data.servicesByEmployee.map((s) => (
-                      <Cell key={`emp-${s.employeeId}`} fill={CHART_COLORS[(s.employeeId ?? 0) % CHART_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+        <DashboardServicesByEmployeeChart servicesByEmployee={data.servicesByEmployee} />
       )}
 
       {/* ═══════════ Próximas Citas ═══════════ */}

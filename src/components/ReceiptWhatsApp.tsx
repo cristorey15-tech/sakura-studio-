@@ -104,7 +104,12 @@ export default function ReceiptWhatsApp({ isOpen, onClose, sale }: ReceiptProps)
   if (!isOpen || !sale) return null;
 
   const receiptText = generateReceiptText(sale);
-  const phone = sale.client?.phone?.replace(/[^0-9+]/g, "") || "";
+  const phone = (() => {
+    const raw = sale.client?.phone?.replace(/[^0-9+]/g, "") || "";
+    // Formato Venezuela: remover 0 inicial y agregar 58
+    const withoutZero = raw.startsWith("0") ? raw.slice(1) : raw;
+    return withoutZero.startsWith("58") || !raw ? raw : `58${withoutZero}`;
+  })();
 
   const sendWhatsApp = () => {
     setSending(true);

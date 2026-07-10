@@ -8,9 +8,10 @@ const SELECT_FIELDS = {
   phone: true,
   freeServiceAvailable: true,
   visitCount: true,
-  sales: {
+  appointments: {
     take: 1,
     orderBy: { date: "desc" } as const,
+    where: { status: "COMPLETADA" },
     select: { date: true },
   },
 };
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
       phone: c.phone,
       freeServiceAvailable: c.freeServiceAvailable,
       visitCount: c.visitCount,
-      lastVisit: c.sales?.[0]?.date ?? null,
+      lastVisit: c.appointments?.[0]?.date ?? null,
     }));
 
     // Sort: clients with recent visits first, then alphabetical
